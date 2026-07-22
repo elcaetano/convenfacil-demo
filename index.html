@@ -900,8 +900,20 @@ tr:hover td{background:var(--bg2)}
       <div class="fg"><label>Email</label><input type="email" id="nc-email" placeholder="jose@email.com"></div>
       <div class="fg"><label>Telefone</label><input type="text" id="nc-tel" placeholder="(11) 99999-9999"></div>
     </div>
-    <div class="fgrid c2"><div class="fg"><label>Plano</label><select id="nc-plano"><option value="basico">Basico</option><option value="profissional">Profissional</option><option value="premium">Premium</option></select></div></div>
+    <div class="fgrid c2">
+      <div class="fg"><label>Plano</label><select id="nc-plano"><option value="basico">Basico</option><option value="profissional">Profissional</option><option value="premium">Premium</option></select></div>
+      <div class="fg"><label>Proximo vencimento</label><input type="date" id="nc-venc"></div>
+    </div>
     <div class="modal-ft"><button class="btn" onclick="closeModals()">Cancelar</button><button class="btn acc" onclick="addSaCliente()">Cadastrar</button></div>
+  </div>
+</div>
+
+<!-- AVISO DE PAGAMENTO EM ATRASO -->
+<div class="ov" id="ov-aviso-pagamento" onclick="if(event.target===this)fecharAvisoPagamento()">
+  <div class="modal" style="max-width:420px;border-color:var(--yellow)">
+    <h2 style="color:var(--yellow)">&#x26A0; Pagamento em atraso</h2>
+    <p style="font-size:14px;color:var(--txt2);line-height:1.6;margin-bottom:6px" id="aviso-pagamento-texto"></p>
+    <div class="modal-ft"><button class="btn acc" onclick="fecharAvisoPagamento()">Entendi, fechar</button></div>
   </div>
 </div>
 
@@ -1079,6 +1091,9 @@ let prods=[],cart=[],cartSnapshot=[],catA='Todos',promos=[],userLogado=null,payM
 let excecoes=[]
 let activeClienteId=null  // id do cliente (loja) cujos dados estao sendo visualizados
 let activeClienteNome=''
+let clienteFuncs=null // funcionalidades liberadas para o cliente logado (null = sem restricao)
+let avisoPagamentoDias=null
+let avisoPagamentoDataLimite=null
 
 const FUNCIONALIDADES=[
   {key:'pdv',label:'PDV',ic:'&#x1F6D2;'},
@@ -1121,11 +1136,63 @@ async function doLogin(){
       // Master nao pertence a nenhuma loja especifica: precisa escolher qual cliente acessar
       mostrarSeletorCliente()
     } else {
+      // Verifica se a empresa (cliente) esta ativa e em dia com o pagamento
+      avisoPagamentoDias=null
+      if(userLogado.cliente_id){
+        var clienteRes=await db.from('clientes').select('ativo,proximo_vencimento').eq('id',userLogado.cliente_id).single()
+        if(clienteRes.data && clienteRes.data.ativo===false){
+          err.textContent='Acesso suspenso. Fale com o suporte para regularizar.'
+          err.style.display='block';btn.textContent='Entrar no sistema';btn.disabled=false
+          userLogado=null
+          return
+        }
+        if(clienteRes.data && clienteRes.data.proximo_vencimento){
+          var venc=new Date(clienteRes.data.proximo_vencimento+'T00:00:00')
+          var hoje=new Date();hoje.setHours(0,0,0,0)
+          var dias=Math.floor((hoje-venc)/86400000)
+          if(dias>0){
+            avisoPagamentoDias=dias
+            var dataLimite=new Date(venc.getTime()+5*86400000)
+            avisoPagamentoDataLimite=dataLimite.toLocaleDateString('pt-BR')
+          }
+        }
+      }
       activeClienteId=userLogado.cliente_id||null
       activeClienteNome=''
+      await loadFuncionalidades()
       iniciarApp()
     }
   }catch(e){err.textContent='Erro de conexao';err.style.display='block';btn.textContent='Entrar no sistema';btn.disabled=false}
+}
+
+// FUNCIONALIDADES LIBERADAS (por plano do cliente)
+async function loadFuncionalidades(){
+  clienteFuncs=null
+  if(!activeClienteId)return
+  var res=await db.from('funcionalidades').select('*').eq('cliente_id',activeClienteId).single()
+  clienteFuncs=res.data||null // null = sem registro ainda, libera tudo por padrao
+}
+
+function mostrarAvisoPagamento(){
+  if(!avisoPagamentoDias)return
+  var txt=document.getElementById('aviso-pagamento-texto')
+  txt.textContent='Identificamos que o pagamento do sistema esta atrasado ha '+avisoPagamentoDias+' dia(s). Regularize ate '+avisoPagamentoDataLimite+' para evitar a suspensao do acesso.'
+  document.getElementById('ov-aviso-pagamento').classList.add('open')
+}
+
+function fecharAvisoPagamento(){
+  document.getElementById('ov-aviso-pagamento').classList.remove('open')
+}
+
+function ajustarMenuPorFuncionalidades(){
+  if(userLogado.nivel==='superadmin')return // Master sempre ve tudo
+  if(!clienteFuncs)return // sem registro de funcionalidades = nao restringe
+  if(!clienteFuncs.promocoes){
+    var navPromos=document.getElementById('nav-promos');if(navPromos)navPromos.style.display='none'
+  }
+  if(!clienteFuncs.financeiro){
+    var grpFin=document.getElementById('grp-fin');if(grpFin)grpFin.style.display='none'
+  }
 }
 
 // SELETOR DE CLIENTE (somente Master/superadmin)
@@ -1168,6 +1235,8 @@ function iniciarApp(){
   var trocaBtn=document.getElementById('btn-trocar-cliente')
   if(trocaBtn)trocaBtn.style.display=(userLogado.nivel==='superadmin')?'block':'none'
   ajustarMenuPorNivel()
+  ajustarMenuPorFuncionalidades()
+  mostrarAvisoPagamento()
   loadProds();loadPromos();loadCategorias()
   tick();setInterval(tick,30000)
 }
@@ -2063,6 +2132,20 @@ async function renderSuperAdmin(){
   document.getElementById('clientes-list').innerHTML=lista.map(function(c,i){
     var f=funcs[i].data||{}
     var pc=c.plano==='premium'?'var(--purple)':c.plano==='profissional'?'var(--acc)':'var(--txt2)'
+    var diasAtraso=null
+    if(c.proximo_vencimento){
+      var venc=new Date(c.proximo_vencimento+'T00:00:00')
+      var hoje=new Date();hoje.setHours(0,0,0,0)
+      diasAtraso=Math.floor((hoje-venc)/86400000)
+    }
+    var statusPag=''
+    if(diasAtraso!==null){
+      if(diasAtraso<=0)statusPag='<span class="tag ok">Pagamento em dia</span>'
+      else if(diasAtraso<=5)statusPag='<span class="tag" style="background:var(--yellow-dim);color:var(--yellow)">&#x26A0; Atrasado '+diasAtraso+'d — avisar cliente</span>'
+      else statusPag='<span class="tag out">&#x26A0; Atrasado '+diasAtraso+'d — considerar suspender</span>'
+    }
+    var fone=(c.telefone||'').replace(/\D/g,'')
+    var btnWhats=(diasAtraso>0&&fone)?'<a class="btn sm" style="background:#25D366;color:#fff" target="_blank" href="https://wa.me/55'+fone+'?text='+encodeURIComponent('Ola '+c.nome+', identificamos que o pagamento do ConvenFacil esta em atraso ha '+diasAtraso+' dia(s). Pode regularizar para continuar usando o sistema sem interrupcoes?')+'">&#x1F4AC; Cobrar</a>':''
     return'<div class="cliente-card">'+
       '<div class="cliente-header">'+
         '<div class="cliente-info">'+
@@ -2073,6 +2156,10 @@ async function renderSuperAdmin(){
           '<span class="tag '+(c.ativo?'ok':'out')+'">'+(c.ativo?'Ativo':'Inativo')+'</span>'+
           '<button class="btn sm '+(c.ativo?'red':'grn')+'" onclick="toggleCliente(\''+c.id+'\','+c.ativo+')">'+(c.ativo?'Suspender':'Ativar')+'</button>'+
         '</div>'+
+      '</div>'+
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">'+
+        '<div style="font-size:12px;color:var(--txt2)">Proximo vencimento: <input type="date" value="'+(c.proximo_vencimento||'')+'" onchange="setVencimento(\''+c.id+'\',this.value)" style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--txt1);padding:3px 6px;font-size:12px"></div>'+
+        statusPag+btnWhats+
       '</div>'+
       '<div style="font-size:10px;color:var(--txt3);margin-bottom:9px;text-transform:uppercase;letter-spacing:.4px;font-weight:600">Funcionalidades liberadas</div>'+
       '<div class="func-grid">'+
@@ -2094,6 +2181,11 @@ async function toggleFunc(clienteId,funcKey,valor,funcId){
   if(funcId&&funcId!==''){await db.from('funcionalidades').update({[funcKey]:valor}).eq('id',funcId)}
   else{await db.from('funcionalidades').insert({cliente_id:clienteId,[funcKey]:valor})}
   toast((valor?'Liberado: ':'Bloqueado: ')+funcKey)
+}
+
+async function setVencimento(id,data){
+  await db.from('clientes').update({proximo_vencimento:data||null}).eq('id',id)
+  renderSuperAdmin();toast('Vencimento atualizado')
 }
 
 async function toggleCliente(id,ativo){
@@ -2220,16 +2312,25 @@ async function addContaReceber(){
   closeModals();renderContasReceber();toast('Conta a receber cadastrada!')
 }
 
+// Funcionalidades liberadas automaticamente por plano (Fase 1 do painel de controle)
+const PLANOS_FUNCIONALIDADES={
+  basico:{pdv:true,estoque:true,promocoes:false,financeiro:false,relatorios:false,multiplos_caixas:false,impressao_cupom:false,maquininha:false,whatsapp_alertas:false},
+  profissional:{pdv:true,estoque:true,promocoes:true,financeiro:true,relatorios:true,multiplos_caixas:true,impressao_cupom:true,maquininha:false,whatsapp_alertas:false},
+  premium:{pdv:true,estoque:true,promocoes:true,financeiro:true,relatorios:true,multiplos_caixas:true,impressao_cupom:true,maquininha:true,whatsapp_alertas:true}
+}
+
 async function addSaCliente(){
   var nome=document.getElementById('nc-nome').value.trim()
   var email=document.getElementById('nc-email').value.trim()
   var tel=document.getElementById('nc-tel').value
   var plano=document.getElementById('nc-plano').value
+  var venc=document.getElementById('nc-venc').value||null
   if(!nome||!email){toast('Preencha nome e email',1);return}
-  var res=await db.from('clientes').insert({nome:nome,email:email,telefone:tel,plano:plano}).select().single()
+  var res=await db.from('clientes').insert({nome:nome,email:email,telefone:tel,plano:plano,ativo:true,proximo_vencimento:venc}).select().single()
   if(res.error){toast('Erro',1);return}
-  await db.from('funcionalidades').insert({cliente_id:res.data.id,pdv:true,estoque:true,promocoes:false,financeiro:false,relatorios:false,multiplos_caixas:false,impressao_cupom:false,maquininha:false,whatsapp_alertas:false})
-  closeModals();renderSuperAdmin();toast('Cliente cadastrado!')
+  var funcsDoPlano=PLANOS_FUNCIONALIDADES[plano]||PLANOS_FUNCIONALIDADES.basico
+  await db.from('funcionalidades').insert(Object.assign({cliente_id:res.data.id},funcsDoPlano))
+  closeModals();renderSuperAdmin();toast('Cliente cadastrado! Funcionalidades do plano '+plano+' aplicadas automaticamente.')
 }
 
 function imprimirCartazModal(){
