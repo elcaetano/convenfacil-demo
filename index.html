@@ -405,6 +405,7 @@ tr:hover td{background:var(--bg2)}
         </div>
         <div class="nav-items" id="grp-gestao-items">
           <div class="nav-item" id="nav-prods" onclick="go('prods',this)"><span class="nav-ic">&#x1F3F7;</span><span>Produtos</span></div>
+          <div class="nav-item" id="nav-categorias" onclick="go('categorias',this)"><span class="nav-ic">&#x1F5C2;</span><span>Categorias</span></div>
           <div class="nav-item" id="nav-clientes" onclick="go('clientes',this)"><span class="nav-ic">&#x1F465;</span><span>Clientes</span></div>
           <div class="nav-item" id="nav-users" onclick="go('users',this)"><span class="nav-ic">&#x1F512;</span><span>Usuarios</span></div>
           <div class="nav-item" id="nav-config" onclick="go('config',this)"><span class="nav-ic">&#x2699;</span><span>Configurações</span></div>
@@ -587,6 +588,18 @@ tr:hover td{background:var(--bg2)}
       </div>
     </div>
 
+    <!-- CATEGORIAS -->
+    <div class="sec" id="sec-categorias">
+      <div class="topbar"><h1>Categorias de Produtos</h1></div>
+      <div class="sec-body">
+        <div class="fg" style="max-width:340px;display:flex;gap:10px;align-items:flex-end">
+          <div style="flex:1"><label>Nome da nova categoria</label><input type="text" id="ncat-nome" placeholder="Ex: Bebidas" onkeydown="if(event.key==='Enter')addCategoria()"></div>
+          <button class="btn acc" onclick="addCategoria()" style="height:38px">+ Adicionar</button>
+        </div>
+        <div class="tbl"><table><thead><tr><th>Nome</th><th></th></tr></thead><tbody id="categorias-tb"></tbody></table></div>
+      </div>
+    </div>
+
     <!-- CLIENTES -->
     <div class="sec" id="sec-clientes">
       <div class="topbar"><h1>Clientes / Fiado</h1><button class="btn acc" onclick="openModal('cliente-fiado')">+ Novo cliente</button></div>
@@ -735,7 +748,7 @@ tr:hover td{background:var(--bg2)}
     <div class="fgrid c1"><div class="fg"><label>Nome</label><input type="text" id="np-n" placeholder="Ex: Agua Mineral 500ml"></div></div>
     <div class="fgrid c3">
       <div class="fg"><label>Codigo de barras</label><input type="text" id="np-c" placeholder="7891234567890"></div>
-      <div class="fg"><label>Categoria</label><select id="np-cat"><option>Bebidas</option><option>Snacks</option><option>Laticinios</option><option>Higiene</option><option>Cigarro</option><option>Limpeza</option><option>Outros</option></select></div>
+      <div class="fg"><label>Categoria</label><select id="np-cat"></select></div>
       <div class="fg"><label>Emoji</label><input type="text" id="np-e" placeholder="🥤" maxlength="2"></div>
     </div>
     <div class="fgrid c3">
@@ -1155,7 +1168,7 @@ function iniciarApp(){
   var trocaBtn=document.getElementById('btn-trocar-cliente')
   if(trocaBtn)trocaBtn.style.display=(userLogado.nivel==='superadmin')?'block':'none'
   ajustarMenuPorNivel()
-  loadProds();loadPromos()
+  loadProds();loadPromos();loadCategorias()
   tick();setInterval(tick,30000)
 }
 
@@ -1218,6 +1231,7 @@ function go(id,el){
   if(id==='estoque')renderEstoque()
   if(id==='fin')renderFin()
   if(id==='prods')renderProds()
+  if(id==='categorias')renderCategorias()
   if(id==='users')renderUsers()
   if(id==='promos')renderPromos()
   if(id==='pagar')renderContasPagar()
@@ -1257,6 +1271,52 @@ async function loadProds(){
 async function loadPromos(){
   var res=await db.from('promocoes').select('*').eq('cliente_id',activeClienteId)
   promos=res.data||[]
+}
+
+// CATEGORIAS
+let categorias=[]
+async function loadCategorias(){
+  var res=await db.from('categorias').select('*').eq('cliente_id',activeClienteId).order('nome')
+  categorias=res.data||[]
+}
+
+async function renderCategorias(){
+  await loadCategorias()
+  var tb=document.getElementById('categorias-tb')
+  if(!categorias.length){tb.innerHTML='<tr><td colspan="2"><div class="empty">Nenhuma categoria cadastrada</div></td></tr>';return}
+  tb.innerHTML=categorias.map(function(c){
+    return'<tr><td>'+c.nome+'</td><td><button class="btn sm red" onclick="delCategoria(\''+c.id+'\')">&#x1F5D1;</button></td></tr>'
+  }).join('')
+}
+
+async function addCategoria(){
+  var input=document.getElementById('ncat-nome')
+  var nome=input.value.trim()
+  if(!nome){toast('Informe o nome da categoria',1);return}
+  if(categorias.some(function(c){return c.nome.toLowerCase()===nome.toLowerCase()})){toast('Categoria ja existe',1);return}
+  var res=await db.from('categorias').insert({nome:nome,cliente_id:activeClienteId}).select().single()
+  if(res.error){toast('Erro ao cadastrar categoria',1);return}
+  categorias.push(res.data)
+  input.value=''
+  renderCategorias()
+  toast('Categoria cadastrada!')
+}
+
+function preencherSelectCategorias(){
+  var sel=document.getElementById('np-cat')
+  if(!categorias.length){
+    sel.innerHTML='<option value="">Nenhuma categoria cadastrada</option>'
+    return
+  }
+  sel.innerHTML=categorias.map(function(c){return'<option value="'+c.nome+'">'+c.nome+'</option>'}).join('')
+}
+
+async function delCategoria(id){
+  if(!confirm('Excluir esta categoria?'))return
+  await db.from('categorias').delete().eq('id',id)
+  categorias=categorias.filter(function(c){return c.id!==id})
+  renderCategorias()
+  toast('Categoria excluida')
 }
 
 function renderCats(){
@@ -1881,7 +1941,8 @@ function editProd(id){
   document.getElementById('np-id').value=p.id
   document.getElementById('np-n').value=p.nome
   document.getElementById('np-c').value=p.codigo_barras||''
-  document.getElementById('np-cat').value=p.categoria||'Bebidas'
+  preencherSelectCategorias()
+  document.getElementById('np-cat').value=p.categoria||''
   document.getElementById('np-e').value=p.emoji||''
   document.getElementById('np-k').value=p.preco_custo
   document.getElementById('np-v').value=p.preco_venda
@@ -2047,6 +2108,7 @@ function openModal(tipo){
     document.getElementById('prod-modal-title').textContent='Cadastrar produto'
     document.getElementById('np-id').value=''
     ;['np-n','np-c','np-e','np-k','np-v','np-q','np-m'].forEach(function(id){document.getElementById(id).value=''})
+    preencherSelectCategorias()
   }
   if(tipo==='promo'){
     document.getElementById('promo-modal-title').textContent='Nova promoção'
