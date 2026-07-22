@@ -901,9 +901,11 @@ tr:hover td{background:var(--bg2)}
       <div class="fg"><label>Telefone</label><input type="text" id="nc-tel" placeholder="(11) 99999-9999"></div>
     </div>
     <div class="fgrid c2">
-      <div class="fg"><label>Plano</label><select id="nc-plano"><option value="basico">Basico</option><option value="profissional">Profissional</option><option value="premium">Premium</option></select></div>
+      <div class="fg"><label>Plano contratado pelo cliente</label><select id="nc-plano" onchange="aplicarPadraoPlano()"><option value="basico">Basico</option><option value="profissional">Profissional</option><option value="premium">Premium</option></select></div>
       <div class="fg"><label>Proximo vencimento</label><input type="date" id="nc-venc"></div>
     </div>
+    <div style="font-size:10px;color:var(--txt3);margin:12px 0 9px;text-transform:uppercase;letter-spacing:.4px;font-weight:600">Funcionalidades liberadas (padrao do plano, ajuste se quiser dar algo a mais)</div>
+    <div class="func-grid" id="nc-func-grid"></div>
     <div class="modal-ft"><button class="btn" onclick="closeModals()">Cancelar</button><button class="btn acc" onclick="addSaCliente()">Cadastrar</button></div>
   </div>
 </div>
@@ -2213,6 +2215,11 @@ function openModal(tipo){
   }
   if(tipo==='pagar')document.getElementById('ncp-venc').value=new Date().toISOString().slice(0,10)
   if(tipo==='receber')document.getElementById('ncr-venc').value=new Date().toISOString().slice(0,10)
+  if(tipo==='sa-cliente'){
+    ;['nc-nome','nc-email','nc-tel','nc-venc'].forEach(function(id){document.getElementById(id).value=''})
+    document.getElementById('nc-plano').value='basico'
+    aplicarPadraoPlano()
+  }
   var ov=document.getElementById('ov-'+tipo)
   if(ov)ov.classList.add('open')
 }
@@ -2319,6 +2326,22 @@ const PLANOS_FUNCIONALIDADES={
   premium:{pdv:true,estoque:true,promocoes:true,financeiro:true,relatorios:true,multiplos_caixas:true,impressao_cupom:true,maquininha:true,whatsapp_alertas:true}
 }
 
+function aplicarPadraoPlano(){
+  var plano=document.getElementById('nc-plano').value
+  var funcsDoPlano=PLANOS_FUNCIONALIDADES[plano]||PLANOS_FUNCIONALIDADES.basico
+  document.getElementById('nc-func-grid').innerHTML=FUNCIONALIDADES.map(function(fn){
+    var ligado=!!funcsDoPlano[fn.key]
+    return'<div class="func-item '+(ligado?'on':'')+'" id="nc-func-item-'+fn.key+'">'+
+      '<div class="func-label"><span>'+fn.ic+'</span>'+fn.label+'</div>'+
+      '<label class="toggle">'+
+        '<input type="checkbox" id="nc-func-'+fn.key+'" '+(ligado?'checked':'')+' onchange="'+
+          'document.getElementById(\'nc-func-item-'+fn.key+'\').classList.toggle(\'on\',this.checked)">'+
+        '<span class="toggle-slider"></span>'+
+      '</label>'+
+    '</div>'
+  }).join('')
+}
+
 async function addSaCliente(){
   var nome=document.getElementById('nc-nome').value.trim()
   var email=document.getElementById('nc-email').value.trim()
@@ -2328,9 +2351,13 @@ async function addSaCliente(){
   if(!nome||!email){toast('Preencha nome e email',1);return}
   var res=await db.from('clientes').insert({nome:nome,email:email,telefone:tel,plano:plano,ativo:true,proximo_vencimento:venc}).select().single()
   if(res.error){toast('Erro',1);return}
-  var funcsDoPlano=PLANOS_FUNCIONALIDADES[plano]||PLANOS_FUNCIONALIDADES.basico
-  await db.from('funcionalidades').insert(Object.assign({cliente_id:res.data.id},funcsDoPlano))
-  closeModals();renderSuperAdmin();toast('Cliente cadastrado! Funcionalidades do plano '+plano+' aplicadas automaticamente.')
+  var funcsEscolhidas={}
+  FUNCIONALIDADES.forEach(function(fn){
+    var chk=document.getElementById('nc-func-'+fn.key)
+    funcsEscolhidas[fn.key]=chk?chk.checked:false
+  })
+  await db.from('funcionalidades').insert(Object.assign({cliente_id:res.data.id},funcsEscolhidas))
+  closeModals();renderSuperAdmin();toast('Cliente cadastrado!')
 }
 
 function imprimirCartazModal(){
