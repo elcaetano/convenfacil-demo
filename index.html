@@ -237,6 +237,10 @@ tr:hover td{background:var(--bg2)}
 .cliente-avatar{width:38px;height:38px;background:linear-gradient(135deg,var(--acc),var(--purple));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700;color:#fff;flex-shrink:0}
 .cliente-name{font-size:14px;font-weight:600}
 .cliente-email{font-size:12px;color:var(--txt3);margin-top:2px}
+.cliente-seletor-wrap{display:none;align-items:center;justify-content:center;height:100vh}
+.cliente-seletor-box{background:var(--bg1);border:1px solid var(--border2);border-radius:var(--rad2);padding:32px;width:440px;max-width:95vw;max-height:80vh;overflow-y:auto;box-shadow:var(--shadow2)}
+.cliente-seletor-item{display:flex;align-items:center;gap:10px;padding:12px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;cursor:pointer;transition:.15s}
+.cliente-seletor-item:hover{border-color:var(--acc);background:var(--bg2)}
 .func-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
 .func-item{display:flex;align-items:center;justify-content:space-between;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:9px 10px}
 .func-item.on{background:rgba(62,207,142,.08);border-color:rgba(62,207,142,.2)}
@@ -347,6 +351,15 @@ tr:hover td{background:var(--bg2)}
   </div>
 </div>
 
+<!-- SELETOR DE CLIENTE (MASTER) -->
+<div class="cliente-seletor-wrap" id="cliente-seletor-wrap">
+  <div class="cliente-seletor-box">
+    <div class="login-title">Qual cliente você quer acessar?</div>
+    <div class="login-sub" style="margin-bottom:16px">Selecione a loja para visualizar os dados dela</div>
+    <div id="cliente-seletor-lista"></div>
+  </div>
+</div>
+
 <!-- APP -->
 <div class="app" id="app">
   <div class="sidebar">
@@ -404,6 +417,7 @@ tr:hover td{background:var(--bg2)}
         </div>
         <div class="nav-items" id="grp-master-items">
           <div class="nav-item" id="nav-superadmin" onclick="go('superadmin',this)" style="color:var(--purple)"><span class="nav-ic">&#x1F3F0;</span><span>Master 4to</span></div>
+          <div class="nav-item" id="nav-leads" onclick="go('leads',this)" style="color:var(--purple)"><span class="nav-ic">&#x1F4E9;</span><span>Leads</span></div>
           <div class="nav-item" id="nav-excecoes" onclick="go('excecoes',this)" style="color:var(--red)"><span class="nav-ic">&#x26A0;</span><span>Exceções</span></div>
         </div>
       </div>
@@ -414,6 +428,7 @@ tr:hover td{background:var(--bg2)}
         <div><div class="sf-name" id="sf-name">-</div><div class="sf-nivel" id="sf-nivel">-</div></div>
       </div>
       <div class="sf-time" id="relogio"></div>
+      <button class="btn-logout" id="btn-trocar-cliente" onclick="trocarCliente()" style="display:none;margin-bottom:6px">&#x1F504; Trocar cliente</button>
       <button class="btn-logout" onclick="doLogout()">&#x1F6AA; Sair</button>
     </div>
   </div>
@@ -649,6 +664,14 @@ tr:hover td{background:var(--bg2)}
           <div class="sa-card"><div class="val" style="color:var(--purple)" id="sa-rec">R$ 0</div><div class="lbl">Receita mensal</div></div>
         </div>
         <div id="clientes-list"><div class="loading"><div class="spin"></div>Carregando...</div></div>
+      </div>
+    </div>
+
+    <!-- LEADS -->
+    <div class="sec" id="sec-leads">
+      <div class="topbar"><h1>Leads da Landing Page</h1></div>
+      <div class="sec-body">
+        <div class="tbl"><table><thead><tr><th>Data</th><th>Nome</th><th>Email</th><th>WhatsApp</th></tr></thead><tbody id="leads-tb"><tr><td colspan="4"><div class="empty">Carregando...</div></td></tr></tbody></table></div>
       </div>
     </div>
 
@@ -1029,8 +1052,20 @@ const SKEY='sb_publishable_DeHWabj6Oh13qkMB7KzNfQ_5e6ZW9Fm'
 const {createClient}=supabase
 const db=createClient(SURL,SKEY)
 
+// Login automatico modo demonstracao (vindo da landing page)
+;(function(){
+  var params=new URLSearchParams(location.search)
+  if(params.get('demo')==='1'){
+    document.getElementById('login-email').value='visitante@convenfacil.com.br'
+    document.getElementById('login-senha').value='testegratis2026'
+    doLogin()
+  }
+})()
+
 let prods=[],cart=[],cartSnapshot=[],catA='Todos',promos=[],userLogado=null,payMetodo=null
 let excecoes=[]
+let activeClienteId=null  // id do cliente (loja) cujos dados estao sendo visualizados
+let activeClienteNome=''
 
 const FUNCIONALIDADES=[
   {key:'pdv',label:'PDV',ic:'&#x1F6D2;'},
@@ -1068,16 +1103,57 @@ async function doLogin(){
   try{
     const {data,error}=await db.from('usuarios').select('*').eq('email',email).eq('senha',senha).eq('ativo',true).single()
     if(error||!data){err.textContent='Email ou senha incorretos';err.style.display='block';btn.textContent='Entrar no sistema';btn.disabled=false;return}
-    userLogado=data;iniciarApp()
+    userLogado=data
+    if(userLogado.nivel==='superadmin'){
+      // Master nao pertence a nenhuma loja especifica: precisa escolher qual cliente acessar
+      mostrarSeletorCliente()
+    } else {
+      activeClienteId=userLogado.cliente_id||null
+      activeClienteNome=''
+      iniciarApp()
+    }
   }catch(e){err.textContent='Erro de conexao';err.style.display='block';btn.textContent='Entrar no sistema';btn.disabled=false}
+}
+
+// SELETOR DE CLIENTE (somente Master/superadmin)
+async function mostrarSeletorCliente(){
+  document.getElementById('login-wrap').style.display='none'
+  document.getElementById('cliente-seletor-wrap').style.display='flex'
+  var box=document.getElementById('cliente-seletor-lista')
+  box.innerHTML='Carregando...'
+  var res=await db.from('clientes').select('*').eq('ativo',true).order('nome')
+  var lista=res.data||[]
+  if(!lista.length){box.innerHTML='<div class="empty">Nenhum cliente ativo cadastrado</div>';return}
+  box.innerHTML=lista.map(function(c){
+    return '<div class="cliente-seletor-item" onclick="entrarComoCliente(\''+c.id+'\',\''+c.nome.replace(/'/g,"\\'")+'\')">'+
+      '<div class="cliente-avatar">'+c.nome.charAt(0).toUpperCase()+'</div>'+
+      '<div><div class="cliente-name">'+c.nome+'</div><div class="cliente-email">'+(c.email||'')+'</div></div>'+
+    '</div>'
+  }).join('')
+}
+
+function entrarComoCliente(clienteId,clienteNome){
+  activeClienteId=clienteId
+  activeClienteNome=clienteNome
+  document.getElementById('cliente-seletor-wrap').style.display='none'
+  iniciarApp()
+}
+
+function trocarCliente(){
+  document.getElementById('app').classList.remove('on')
+  activeClienteId=null;activeClienteNome=''
+  mostrarSeletorCliente()
 }
 
 function iniciarApp(){
   document.getElementById('login-wrap').style.display='none'
+  document.getElementById('cliente-seletor-wrap').style.display='none'
   document.getElementById('app').classList.add('on')
   document.getElementById('sf-avatar').textContent=userLogado.nome.charAt(0).toUpperCase()
   document.getElementById('sf-name').textContent=userLogado.nome
-  document.getElementById('sf-nivel').textContent=userLogado.nivel
+  document.getElementById('sf-nivel').textContent=userLogado.nivel+(activeClienteNome?' · '+activeClienteNome:'')
+  var trocaBtn=document.getElementById('btn-trocar-cliente')
+  if(trocaBtn)trocaBtn.style.display=(userLogado.nivel==='superadmin')?'block':'none'
   ajustarMenuPorNivel()
   loadProds();loadPromos()
   tick();setInterval(tick,30000)
@@ -1107,6 +1183,7 @@ function ajustarMenuPorNivel(){
 
 function doLogout(){
   userLogado=null;cart=[]
+  activeClienteId=null;activeClienteNome=''
   document.getElementById('app').classList.remove('on')
   document.getElementById('login-wrap').style.display='flex'
   document.getElementById('login-email').value=''
@@ -1149,6 +1226,7 @@ function go(id,el){
   if(id==='clientes')renderClientesFiado()
   if(id==='relatorio')renderRelatorio()
   if(id==='excecoes')renderExceções()
+  if(id==='leads')renderLeads()
 }
 
 // BARCODE
@@ -1170,14 +1248,14 @@ function barcodeEnter(e){
 
 // PRODUTOS
 async function loadProds(){
-  var res=await db.from('produtos').select('*').order('nome')
+  var res=await db.from('produtos').select('*').eq('cliente_id',activeClienteId).order('nome')
   prods=res.data||[]
   renderCats();renderPDV();updateBadge()
   document.getElementById('pdv-info').textContent=prods.length+' produtos'
 }
 
 async function loadPromos(){
-  var res=await db.from('promocoes').select('*')
+  var res=await db.from('promocoes').select('*').eq('cliente_id',activeClienteId)
   promos=res.data||[]
 }
 
@@ -1301,7 +1379,7 @@ function abrirConfirmar(metodo){
 }
 
 async function carregarClientesFiado(){
-  var res=await db.from('clientes_fiado').select('*').order('nome')
+  var res=await db.from('clientes_fiado').select('*').eq('cliente_id',activeClienteId).order('nome')
   var lista=res.data||[]
   var sel=document.getElementById('fiado-cliente-sel')
   sel.innerHTML='<option value="">-- Selecione ou cadastre --</option>'+lista.map(function(c){
@@ -1394,11 +1472,11 @@ function confirmarVenda(){
 async function pay(metodo,cpf,imprimirRecibo){
   if(!cart.length){toast('Adicione produtos',1);return}
   var total=cart.reduce(function(a,c){return a+Number(c.preco_final)*c.qty},0)
-  var res=await db.from('vendas').insert({total:total,forma_pagamento:metodo}).select().single()
+  var res=await db.from('vendas').insert({total:total,forma_pagamento:metodo,cliente_id:activeClienteId}).select().single()
   if(res.error){toast('Erro ao registrar venda',1);return}
   var venda=res.data
   await db.from('itens_venda').insert(cart.map(function(c){
-    return{venda_id:venda.id,produto_id:c.id,quantidade:c.qty,preco_unitario:Number(c.preco_final)}
+    return{venda_id:venda.id,produto_id:c.id,quantidade:c.qty,preco_unitario:Number(c.preco_final),cliente_id:activeClienteId}
   }))
   for(var i=0;i<cart.length;i++){
     var c=cart[i]
@@ -1556,9 +1634,9 @@ function updateBadge(){
 // FINANCEIRO
 async function renderFin(){
   var results=await Promise.all([
-    db.from('vendas').select('*').order('criado_em',{ascending:false}),
-    db.from('contas_pagar').select('valor').eq('pago',false),
-    db.from('contas_receber').select('valor').eq('recebido',false)
+    db.from('vendas').select('*').eq('cliente_id',activeClienteId).order('criado_em',{ascending:false}),
+    db.from('contas_pagar').select('valor').eq('cliente_id',activeClienteId).eq('pago',false),
+    db.from('contas_receber').select('valor').eq('cliente_id',activeClienteId).eq('recebido',false)
   ])
   var vendas=results[0].data||[]
   var totalCP=(results[1].data||[]).reduce(function(a,c){return a+Number(c.valor)},0)
@@ -1593,7 +1671,7 @@ async function renderFin(){
 
 // CONTAS A PAGAR
 async function renderContasPagar(){
-  var res=await db.from('contas_pagar').select('*').order('vencimento')
+  var res=await db.from('contas_pagar').select('*').eq('cliente_id',activeClienteId).order('vencimento')
   var contas=res.data||[]
   var hoje=new Date().toISOString().slice(0,10)
   var mes=hoje.slice(0,7)
@@ -1655,7 +1733,7 @@ function printRelPagar(periodo){
 
 // CONTAS A RECEBER
 async function renderContasReceber(){
-  var res=await db.from('contas_receber').select('*').order('vencimento')
+  var res=await db.from('contas_receber').select('*').eq('cliente_id',activeClienteId).order('vencimento')
   var contas=res.data||[]
   var hoje=new Date().toISOString().slice(0,10)
   var mes=hoje.slice(0,7)
@@ -1669,7 +1747,7 @@ async function renderContasReceber(){
   document.getElementById('cr-recebido').textContent='R$ '+recebidas.reduce(function(a,c){return a+Number(c.valor)},0).toFixed(2)
   document.getElementById('cr-recebido-count').textContent=recebidas.length+' recebidos'
   // Fiados do dia
-  var fiadosDia=await db.from('vendas').select('*').eq('forma_pagamento','Fiado').gte('criado_em',hoje)
+  var fiadosDia=await db.from('vendas').select('*').eq('cliente_id',activeClienteId).eq('forma_pagamento','Fiado').gte('criado_em',hoje)
   var fd=fiadosDia.data||[]
   var fdEl=document.getElementById('fiados-dia')
   if(!fd.length){fdEl.innerHTML='<div class="empty" style="padding:12px 0">Nenhum fiado hoje</div>'}
@@ -1714,7 +1792,7 @@ async function renderRelatorio(){
   var el=document.getElementById('rel-content')
   el.innerHTML='<div class="loading"><div class="spin"></div>Carregando...</div>'
   if(tipo==='vendas'){
-    var res=await db.from('vendas').select('*').gte('criado_em',dataInicio).order('criado_em',{ascending:false})
+    var res=await db.from('vendas').select('*').eq('cliente_id',activeClienteId).gte('criado_em',dataInicio).order('criado_em',{ascending:false})
     var vendas=res.data||[]
     var total=vendas.reduce(function(a,v){return a+Number(v.total)},0)
     el.innerHTML='<div class="mc b" style="margin-bottom:16px"><div class="lbl">Total do periodo</div><div class="val">R$ '+total.toFixed(2)+'</div><div class="sub">'+vendas.length+' vendas</div></div>'+
@@ -1722,7 +1800,7 @@ async function renderRelatorio(){
       (vendas.length?vendas.map(function(v){return'<tr><td>'+new Date(v.criado_em).toLocaleString('pt-BR')+'</td><td>'+v.forma_pagamento+'</td><td style="color:var(--green);font-weight:600">R$ '+Number(v.total).toFixed(2)+'</td></tr>'}).join(''):'<tr><td colspan="3"><div class="empty">Nenhuma venda</div></td></tr>')+
       '</tbody></table></div>'
   } else if(tipo==='pix'){
-    var res=await db.from('vendas').select('*').eq('forma_pagamento','PIX').gte('criado_em',dataInicio).order('criado_em',{ascending:false})
+    var res=await db.from('vendas').select('*').eq('cliente_id',activeClienteId).eq('forma_pagamento','PIX').gte('criado_em',dataInicio).order('criado_em',{ascending:false})
     var vendas=res.data||[]
     var total=vendas.reduce(function(a,v){return a+Number(v.total)},0)
     el.innerHTML='<div class="mc b" style="margin-bottom:16px"><div class="lbl">Total PIX no periodo</div><div class="val">R$ '+total.toFixed(2)+'</div><div class="sub">'+vendas.length+' transacoes PIX</div></div>'+
@@ -1730,7 +1808,7 @@ async function renderRelatorio(){
       (vendas.length?vendas.map(function(v){return'<tr><td>'+new Date(v.criado_em).toLocaleString('pt-BR')+'</td><td style="color:var(--green);font-weight:600">R$ '+Number(v.total).toFixed(2)+'</td></tr>'}).join(''):'<tr><td colspan="2"><div class="empty">Nenhuma transacao PIX</div></td></tr>')+
       '</tbody></table></div>'
   } else if(tipo==='pagar'){
-    var res=await db.from('contas_pagar').select('*').gte('vencimento',dataInicio).order('vencimento')
+    var res=await db.from('contas_pagar').select('*').eq('cliente_id',activeClienteId).gte('vencimento',dataInicio).order('vencimento')
     var contas=res.data||[]
     var total=contas.reduce(function(a,c){return a+Number(c.valor)},0)
     el.innerHTML='<div class="mc r" style="margin-bottom:16px"><div class="lbl">Total a pagar no periodo</div><div class="val">R$ '+total.toFixed(2)+'</div><div class="sub">'+contas.length+' contas</div></div>'+
@@ -1825,7 +1903,7 @@ async function delProd(id){
 
 // CLIENTES FIADO
 async function renderClientesFiado(){
-  var res=await db.from('clientes_fiado').select('*').order('nome')
+  var res=await db.from('clientes_fiado').select('*').eq('cliente_id',activeClienteId).order('nome')
   var lista=res.data||[]
   var tb=document.getElementById('clientes-tb')
   if(!lista.length){tb.innerHTML='<tr><td colspan="5"><div class="empty">Nenhum cliente cadastrado</div></td></tr>';return}
@@ -1859,7 +1937,7 @@ async function addClienteFiado(){
   var num=document.getElementById('ncf-num').value.trim()
   var obs=document.getElementById('ncf-obs').value.trim()
   if(!nome){toast('Informe o nome',1);return}
-  var res=await db.from('clientes_fiado').insert({nome:nome,telefone:tel,cpf:cpf,cep:cep,endereco:end,numero:num,observacao:obs})
+  var res=await db.from('clientes_fiado').insert({nome:nome,telefone:tel,cpf:cpf,cep:cep,endereco:end,numero:num,observacao:obs,cliente_id:activeClienteId})
   if(res.error){toast('Erro ao cadastrar cliente',1);return}
   closeModals()
   renderClientesFiado()
@@ -1870,7 +1948,7 @@ async function addClienteFiado(){
 
 // USUARIOS
 async function renderUsers(){
-  var res=await db.from('usuarios').select('*').order('nome')
+  var res=await db.from('usuarios').select('*').eq('cliente_id',activeClienteId).order('nome')
   var tb=document.getElementById('users-tb')
   if(!res.data){tb.innerHTML='<tr><td colspan="5"><div class="empty">Erro</div></td></tr>';return}
   var nl={superadmin:'Super Admin',admin:'Administrador',gerente:'Gerente',operador:'Operador'}
@@ -1888,6 +1966,19 @@ async function renderUsers(){
 async function toggleUser(id,ativo){
   await db.from('usuarios').update({ativo:!ativo}).eq('id',id)
   renderUsers();toast('Usuario '+(ativo?'desativado':'ativado'))
+}
+
+// LEADS (capturados na landing page)
+async function renderLeads(){
+  var tb=document.getElementById('leads-tb')
+  var res=await db.from('leads').select('*').order('created_at',{ascending:false})
+  var lista=res.data||[]
+  if(res.error){tb.innerHTML='<tr><td colspan="4"><div class="empty">Erro ao carregar leads</div></td></tr>';return}
+  if(!lista.length){tb.innerHTML='<tr><td colspan="4"><div class="empty">Nenhum lead ainda</div></td></tr>';return}
+  tb.innerHTML=lista.map(function(l){
+    var dt=l.created_at?new Date(l.created_at).toLocaleString('pt-BR'):''
+    return'<tr><td>'+dt+'</td><td>'+(l.nome||'')+'</td><td>'+(l.email||'')+'</td><td>'+(l.whatsapp||'-')+'</td></tr>'
+  }).join('')
 }
 
 // EXCECOES
@@ -2000,6 +2091,7 @@ async function saveProd(){
     if(idx>=0)prods[idx]=res.data
     toast('Produto atualizado!')
   } else {
+    prod.cliente_id=activeClienteId
     var res=await db.from('produtos').insert(prod).select().single()
     if(res.error){toast('Erro ao cadastrar',1);return}
     prods.push(res.data)
@@ -2016,7 +2108,7 @@ async function savePromo(){
   var desc=document.getElementById('promo-desc').value
   var id=document.getElementById('promo-id').value
   if(!val){toast('Informe o valor',1);return}
-  var data={produto_id:prod_id,tipo:tipo,valor:val,valido_ate:ate,descricao:desc}
+  var data={produto_id:prod_id,tipo:tipo,valor:val,valido_ate:ate,descricao:desc,cliente_id:activeClienteId}
   if(id){
     await db.from('promocoes').update(data).eq('id',id)
     var idx=promos.findIndex(function(x){return x.id===id})
@@ -2037,7 +2129,7 @@ async function addUser(){
   var senha=document.getElementById('nu-senha').value
   var nivel=document.getElementById('nu-nivel').value
   if(!nome||!email||!senha){toast('Preencha todos os campos',1);return}
-  var res=await db.from('usuarios').insert({nome:nome,email:email,senha:senha,nivel:nivel})
+  var res=await db.from('usuarios').insert({nome:nome,email:email,senha:senha,nivel:nivel,cliente_id:activeClienteId})
   if(res.error){toast('Erro ao cadastrar',1);return}
   closeModals();renderUsers();toast('Usuario cadastrado!')
 }
@@ -2049,7 +2141,7 @@ async function addContaPagar(){
   var venc=document.getElementById('ncp-venc').value
   var obs=document.getElementById('ncp-obs').value
   if(!desc||!valor||!venc){toast('Preencha todos os campos',1);return}
-  var res=await db.from('contas_pagar').insert({descricao:desc,categoria:cat,valor:valor,vencimento:venc,observacao:obs})
+  var res=await db.from('contas_pagar').insert({descricao:desc,categoria:cat,valor:valor,vencimento:venc,observacao:obs,cliente_id:activeClienteId})
   if(res.error){toast('Erro',1);return}
   closeModals();renderContasPagar();toast('Conta a pagar cadastrada!')
 }
@@ -2061,7 +2153,7 @@ async function addContaReceber(){
   var venc=document.getElementById('ncr-venc').value
   var obs=document.getElementById('ncr-obs').value
   if(!desc||!cliente||!valor||!venc){toast('Preencha todos os campos',1);return}
-  var res=await db.from('contas_receber').insert({descricao:desc,cliente_nome:cliente,valor:valor,vencimento:venc,observacao:obs})
+  var res=await db.from('contas_receber').insert({descricao:desc,cliente_nome:cliente,valor:valor,vencimento:venc,observacao:obs,cliente_id:activeClienteId})
   if(res.error){toast('Erro',1);return}
   closeModals();renderContasReceber();toast('Conta a receber cadastrada!')
 }
