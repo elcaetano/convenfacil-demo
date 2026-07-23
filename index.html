@@ -996,18 +996,19 @@ tr:hover td{background:var(--bg2)}
       <div style="font-size:36px;margin-bottom:6px">&#x1F4F1;</div>
       <h2>Pagamento via PIX</h2>
       <div style="font-size:22px;font-weight:800;color:var(--green);margin:10px 0" id="pix-total">R$ 0,00</div>
-      <p style="font-size:12px;color:var(--txt2);margin-bottom:10px">Escaneie o QR Code ou copie a chave PIX</p>
+      <p style="font-size:12px;color:var(--txt2);margin-bottom:10px" id="pix-instrucao">Escaneie o QR Code ou copie a chave PIX</p>
       <canvas id="pix-qrcode"></canvas>
-      <div style="font-size:12px;color:var(--txt3);margin-bottom:6px">Chave PIX configurada:</div>
+      <img id="pix-qrcode-img" style="display:none;max-width:220px;width:100%;border-radius:8px" />
+      <div style="font-size:12px;color:var(--txt3);margin-bottom:6px" id="pix-chave-label">Chave PIX configurada:</div>
       <div class="pix-code" id="pix-chave-display">Configure a chave PIX nas configuracoes</div>
-      <button class="btn acc" style="width:100%;justify-content:center;margin-bottom:8px" onclick="copiarPIX()">&#x1F4CB; Copiar chave PIX</button>
-      <div style="background:var(--green-dim);border:1px solid rgba(62,207,142,.3);border-radius:var(--rad);padding:10px;font-size:12px;color:var(--green);margin-bottom:10px" id="pix-confirmacao" style="display:none">
-        Apos confirmar o pagamento no celular, clique em confirmar abaixo
+      <button class="btn acc" style="width:100%;justify-content:center;margin-bottom:8px" id="pix-btn-copiar" onclick="copiarPIX()">&#x1F4CB; Copiar chave PIX</button>
+      <div style="background:var(--green-dim);border:1px solid rgba(62,207,142,.3);border-radius:var(--rad);padding:10px;font-size:12px;color:var(--green);margin-bottom:10px;display:none" id="pix-aguardando">
+        &#x23F3; Aguardando confirmacao automatica do pagamento...
       </div>
     </div>
-    <div class="modal-ft">
-      <button class="btn" onclick="closeModals()">Cancelar</button>
-      <button class="btn grn" onclick="confirmarPay('PIX');closeModals()">&#x2713; Confirmar PIX recebido</button>
+    <div class="modal-ft" id="pix-modal-ft">
+      <button class="btn" onclick="fecharModalPIX()">Cancelar</button>
+      <button class="btn grn" id="pix-btn-manual" onclick="confirmarPay('PIX');closeModals()">&#x2713; Confirmar PIX recebido</button>
     </div>
   </div>
 </div>
@@ -2239,6 +2240,7 @@ function closeModals(){
 // Fechar modal ao clicar no overlay
 document.addEventListener('click', function(e){
   if(e.target.classList.contains('ov') && e.target.classList.contains('open')){
+    if(e.target.id === 'ov-pix') pararPollPIX()
     e.target.classList.remove('open')
   }
 })
@@ -2914,21 +2916,128 @@ function pararCameraModal(){
 }
 
 // PIX QR CODE
-function abrirPIX(){
+var pixPollTimer = null
+var pixVendaAtualId = null
+var pixCodigoCopiaECola = null
+
+async function abrirPIX(){
   if(!cart.length){ toast('Adicione produtos ao pedido', 1); return }
   var total = cart.reduce(function(a,c){ return a + Number(c.preco_final)*c.qty }, 0)
   document.getElementById('pix-total').textContent = 'R$ ' + total.toFixed(2)
-  // Chave PIX salva no localStorage
+  document.getElementById('ov-pix').classList.add('open')
+
+  // Verifica se esta loja tem Pix automatico (Mercado Pago) conectado
+  var conectado = false
+  try{
+    var resCliente = await db.from('clientes').select('mp_conectado').eq('id',activeClienteId).single()
+    conectado = !!(resCliente.data && resCliente.data.mp_conectado)
+  }catch(e){ conectado = false }
+
+  if(conectado){
+    abrirPIXAutomatico(total)
+  }else{
+    abrirPIXManual(total)
+  }
+}
+
+function abrirPIXManual(total){
+  // Fluxo manual (chave PIX estatica, confirmacao no honor system)
+  pixCodigoCopiaECola = null
+  document.getElementById('pix-instrucao').textContent = 'Escaneie o QR Code ou copie a chave PIX'
+  document.getElementById('pix-qrcode').style.display = ''
+  document.getElementById('pix-qrcode-img').style.display = 'none'
+  document.getElementById('pix-chave-label').style.display = ''
+  document.getElementById('pix-chave-display').style.display = ''
+  document.getElementById('pix-btn-copiar').style.display = ''
+  document.getElementById('pix-btn-manual').style.display = ''
+  document.getElementById('pix-aguardando').style.display = 'none'
   var chavePix = localStorage.getItem('chave_pix') || 'convenfacil@4to.com.br'
   document.getElementById('pix-chave-display').textContent = chavePix
-  // Gerar payload PIX (formato EMV)
   var payload = gerarPayloadPIX(chavePix, total)
-  // Gerar QR Code
   var canvas = document.getElementById('pix-qrcode')
   QRCode.toCanvas(canvas, payload, {width: 220, margin: 2, color:{dark:'#000000', light:'#ffffff'}}, function(err){
     if(err) console.error(err)
   })
-  document.getElementById('ov-pix').classList.add('open')
+}
+
+async function abrirPIXAutomatico(total){
+  document.getElementById('pix-instrucao').textContent = 'Gerando cobranca Pix...'
+  document.getElementById('pix-qrcode').style.display = 'none'
+  document.getElementById('pix-qrcode-img').style.display = 'none'
+  document.getElementById('pix-chave-label').style.display = 'none'
+  document.getElementById('pix-chave-display').style.display = 'none'
+  document.getElementById('pix-btn-copiar').style.display = 'none'
+  document.getElementById('pix-btn-manual').style.display = 'none'
+  document.getElementById('pix-aguardando').style.display = 'none'
+
+  try{
+    var resp = await fetch(SURL + '/functions/v1/criar-pix-venda', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SKEY, 'apikey': SKEY },
+      body: JSON.stringify({ cliente_id: activeClienteId, valor: total, descricao: 'Venda ConvenFacil' })
+    })
+    var data = await resp.json()
+    if(!resp.ok || !data.qr_code_base64){
+      console.error('Erro criar-pix-venda:', data)
+      toast('Erro ao gerar Pix automatico. Usando modo manual.', 1)
+      abrirPIXManual(total)
+      return
+    }
+
+    // Registra a venda como pendente (nao mexe no estoque ainda - so o webhook faz isso)
+    var resVenda = await db.from('vendas').insert({
+      total: total, forma_pagamento: 'PIX', cliente_id: activeClienteId,
+      status_pagamento: 'pendente', mp_payment_id: data.payment_id
+    }).select().single()
+    if(resVenda.error){ toast('Erro ao registrar venda', 1); return }
+    var venda = resVenda.data
+    pixVendaAtualId = venda.id
+    await db.from('itens_venda').insert(cart.map(function(c){
+      return{venda_id:venda.id,produto_id:c.id,quantidade:c.qty,preco_unitario:Number(c.preco_final),cliente_id:activeClienteId}
+    }))
+    cartSnapshot = cart.slice()
+
+    pixCodigoCopiaECola = data.qr_code
+    document.getElementById('pix-instrucao').textContent = 'Escaneie o QR Code no app do seu banco'
+    var img = document.getElementById('pix-qrcode-img')
+    img.src = 'data:image/png;base64,' + data.qr_code_base64
+    img.style.display = ''
+    document.getElementById('pix-chave-label').style.display = ''
+    document.getElementById('pix-chave-label').textContent = 'Pix copia e cola:'
+    document.getElementById('pix-chave-display').style.display = ''
+    document.getElementById('pix-chave-display').textContent = data.qr_code
+    document.getElementById('pix-btn-copiar').style.display = ''
+    document.getElementById('pix-aguardando').style.display = ''
+
+    iniciarPollPIX(venda.id)
+  }catch(e){
+    console.error(e)
+    toast('Erro ao gerar Pix automatico. Usando modo manual.', 1)
+    abrirPIXManual(total)
+  }
+}
+
+function iniciarPollPIX(vendaId){
+  pararPollPIX()
+  pixPollTimer = setInterval(async function(){
+    var res = await db.from('vendas').select('status_pagamento').eq('id',vendaId).single()
+    if(res.data && res.data.status_pagamento === 'pago'){
+      pararPollPIX()
+      toast('Pagamento Pix confirmado!')
+      closeModals()
+      cart=[];renderCart();renderPDV();updateBadge()
+      loadProds()
+    }
+  }, 3000)
+}
+
+function pararPollPIX(){
+  if(pixPollTimer){ clearInterval(pixPollTimer); pixPollTimer = null }
+}
+
+function fecharModalPIX(){
+  pararPollPIX()
+  closeModals()
 }
 
 function gerarPayloadPIX(chave, valor){
@@ -2967,9 +3076,9 @@ function crc16(str){
 }
 
 function copiarPIX(){
-  var chave = localStorage.getItem('chave_pix') || 'convenfacil@4to.com.br'
-  navigator.clipboard.writeText(chave).then(function(){
-    toast('Chave PIX copiada!')
+  var valor = pixCodigoCopiaECola || localStorage.getItem('chave_pix') || 'convenfacil@4to.com.br'
+  navigator.clipboard.writeText(valor).then(function(){
+    toast(pixCodigoCopiaECola ? 'Codigo Pix copiado!' : 'Chave PIX copiada!')
   }).catch(function(){
     toast('Erro ao copiar', 1)
   })
