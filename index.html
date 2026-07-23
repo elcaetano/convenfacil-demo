@@ -644,6 +644,13 @@ tr:hover td{background:var(--bg2)}
 
           </div>
         </div>
+        <!-- MERCADO PAGO (PIX AUTOMATICO) -->
+        <div class="lcard" style="margin-top:16px">
+          <h3 style="margin-bottom:8px">&#x1F4B3; Pix automático (Mercado Pago)</h3>
+          <p style="margin:0 0 14px;color:var(--muted,#888);font-size:13px">Conecte sua conta Mercado Pago para gerar QR Code de Pix direto no PDV e ter a baixa automática das vendas quando o cliente pagar.</p>
+          <div class="lrow"><span>Status da conexão</span><span id="mp-status" class="tag out">Não conectado</span></div>
+          <button class="btn acc" id="mp-btn-conectar" style="width:100%;justify-content:center;margin-top:8px" onclick="conectarMercadoPago()">&#x1F517; Conectar Mercado Pago</button>
+        </div>
         <!-- STATUS DAS CONFIGS -->
         <div class="lcard" style="margin-top:16px">
           <h3 style="margin-bottom:14px">&#x2705; Status das configurações</h3>
@@ -1240,6 +1247,7 @@ function iniciarApp(){
   ajustarMenuPorFuncionalidades()
   mostrarAvisoPagamento()
   loadProds();loadPromos();loadCategorias()
+  carregarStatusMercadoPago()
   tick();setInterval(tick,30000)
 }
 
@@ -2538,6 +2546,49 @@ function salvarConfigImpressao(){
   toast('Configuracao de impressao salva!')
 }
 
+// MERCADO PAGO - CONEXAO OAUTH (Pix automatico por cliente)
+var MP_CLIENT_ID='3092482376472257'
+var MP_REDIRECT_URI='https://jkantpfxudbqzrtrctgp.supabase.co/functions/v1/mercadopago-oauth-callback'
+
+function conectarMercadoPago(){
+  if(!activeClienteId){toast('Nenhuma loja selecionada.');return}
+  var url='https://auth.mercadopago.com.br/authorization'
+    +'?client_id='+encodeURIComponent(MP_CLIENT_ID)
+    +'&response_type=code'
+    +'&platform_id=mp'
+    +'&state='+encodeURIComponent(activeClienteId)
+    +'&redirect_uri='+encodeURIComponent(MP_REDIRECT_URI)
+  window.location.href=url
+}
+
+async function carregarStatusMercadoPago(){
+  var el=document.getElementById('mp-status')
+  var btn=document.getElementById('mp-btn-conectar')
+  if(!el||!activeClienteId)return
+  var res=await db.from('clientes').select('mp_conectado').eq('id',activeClienteId).single()
+  var conectado=res.data&&res.data.mp_conectado
+  if(conectado){
+    el.textContent='Conectado'
+    el.className='tag ok'
+    if(btn)btn.textContent='↻ Reconectar Mercado Pago'
+  }else{
+    el.textContent='Não conectado'
+    el.className='tag out'
+    if(btn)btn.innerHTML='&#x1F517; Conectar Mercado Pago'
+  }
+}
+
+function verificarRetornoMercadoPago(){
+  var params=new URLSearchParams(window.location.search)
+  var status=params.get('mp_conectado')
+  if(!status)return
+  if(status==='ok')toast('Mercado Pago conectado com sucesso!')
+  else toast('Não foi possível conectar o Mercado Pago. Tente novamente.')
+  params.delete('mp_conectado')
+  var novaUrl=window.location.pathname+(params.toString()?'?'+params.toString():'')
+  window.history.replaceState({},'',novaUrl)
+}
+
 // ABAS DO MODAL PROMO
 function atualizarPreviewCartaz(){
   var promoId = document.getElementById('promo-id').value
@@ -2987,6 +3038,7 @@ function toast(msg,err){
 }
 
 loadProds();loadPromos()
+verificarRetornoMercadoPago()
 </script>
 </body>
 </html>
