@@ -237,10 +237,6 @@ tr:hover td{background:var(--bg2)}
 .cliente-avatar{width:38px;height:38px;background:linear-gradient(135deg,var(--acc),var(--purple));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700;color:#fff;flex-shrink:0}
 .cliente-name{font-size:14px;font-weight:600}
 .cliente-email{font-size:12px;color:var(--txt3);margin-top:2px}
-.cliente-seletor-wrap{display:none;align-items:center;justify-content:center;height:100vh}
-.cliente-seletor-box{background:var(--bg1);border:1px solid var(--border2);border-radius:var(--rad2);padding:32px;width:440px;max-width:95vw;max-height:80vh;overflow-y:auto;box-shadow:var(--shadow2)}
-.cliente-seletor-item{display:flex;align-items:center;gap:10px;padding:12px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;cursor:pointer;transition:.15s}
-.cliente-seletor-item:hover{border-color:var(--acc);background:var(--bg2)}
 .func-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
 .func-item{display:flex;align-items:center;justify-content:space-between;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:9px 10px}
 .func-item.on{background:rgba(62,207,142,.08);border-color:rgba(62,207,142,.2)}
@@ -347,16 +343,7 @@ tr:hover td{background:var(--bg2)}
     <div class="fg"><label>Email</label><input type="email" id="login-email" placeholder="seu@email.com" onkeydown="if(event.key==='Enter')doLogin()"></div>
     <div class="fg"><label>Senha</label><input type="password" id="login-senha" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
     <button class="btn-login" onclick="doLogin()" id="btn-login-do">Entrar no sistema</button>
-    <div class="login-footer">ConvênFácil &copy; 2025 &mdash; 4to.com.br</div>
-  </div>
-</div>
-
-<!-- SELETOR DE CLIENTE (MASTER) -->
-<div class="cliente-seletor-wrap" id="cliente-seletor-wrap">
-  <div class="cliente-seletor-box">
-    <div class="login-title">Qual cliente você quer acessar?</div>
-    <div class="login-sub" style="margin-bottom:16px">Selecione a loja para visualizar os dados dela</div>
-    <div id="cliente-seletor-lista"></div>
+    <div class="login-footer">ConvênFácil &copy; 2025 &mdash; <a href="https://ninjai.com.br" target="_blank"><img src="https://www.ninjai.com.br/ninjai-logo.png" alt="NinjAI" style="height:16px;vertical-align:middle;opacity:.7;transition:.2s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.7"></a></div>
   </div>
 </div>
 
@@ -405,7 +392,6 @@ tr:hover td{background:var(--bg2)}
         </div>
         <div class="nav-items" id="grp-gestao-items">
           <div class="nav-item" id="nav-prods" onclick="go('prods',this)"><span class="nav-ic">&#x1F3F7;</span><span>Produtos</span></div>
-          <div class="nav-item" id="nav-categorias" onclick="go('categorias',this)"><span class="nav-ic">&#x1F5C2;</span><span>Categorias</span></div>
           <div class="nav-item" id="nav-clientes" onclick="go('clientes',this)"><span class="nav-ic">&#x1F465;</span><span>Clientes</span></div>
           <div class="nav-item" id="nav-users" onclick="go('users',this)"><span class="nav-ic">&#x1F512;</span><span>Usuarios</span></div>
           <div class="nav-item" id="nav-config" onclick="go('config',this)"><span class="nav-ic">&#x2699;</span><span>Configurações</span></div>
@@ -418,7 +404,6 @@ tr:hover td{background:var(--bg2)}
         </div>
         <div class="nav-items" id="grp-master-items">
           <div class="nav-item" id="nav-superadmin" onclick="go('superadmin',this)" style="color:var(--purple)"><span class="nav-ic">&#x1F3F0;</span><span>Master 4to</span></div>
-          <div class="nav-item" id="nav-leads" onclick="go('leads',this)" style="color:var(--purple)"><span class="nav-ic">&#x1F4E9;</span><span>Leads</span></div>
           <div class="nav-item" id="nav-excecoes" onclick="go('excecoes',this)" style="color:var(--red)"><span class="nav-ic">&#x26A0;</span><span>Exceções</span></div>
         </div>
       </div>
@@ -429,7 +414,6 @@ tr:hover td{background:var(--bg2)}
         <div><div class="sf-name" id="sf-name">-</div><div class="sf-nivel" id="sf-nivel">-</div></div>
       </div>
       <div class="sf-time" id="relogio"></div>
-      <button class="btn-logout" id="btn-trocar-cliente" onclick="trocarCliente()" style="display:none;margin-bottom:6px">&#x1F504; Trocar cliente</button>
       <button class="btn-logout" onclick="doLogout()">&#x1F6AA; Sair</button>
     </div>
   </div>
@@ -588,18 +572,6 @@ tr:hover td{background:var(--bg2)}
       </div>
     </div>
 
-    <!-- CATEGORIAS -->
-    <div class="sec" id="sec-categorias">
-      <div class="topbar"><h1>Categorias de Produtos</h1></div>
-      <div class="sec-body">
-        <div class="fg" style="max-width:340px;display:flex;gap:10px;align-items:flex-end">
-          <div style="flex:1"><label>Nome da nova categoria</label><input type="text" id="ncat-nome" placeholder="Ex: Bebidas" onkeydown="if(event.key==='Enter')addCategoria()"></div>
-          <button class="btn acc" onclick="addCategoria()" style="height:38px">+ Adicionar</button>
-        </div>
-        <div class="tbl"><table><thead><tr><th>Nome</th><th></th></tr></thead><tbody id="categorias-tb"></tbody></table></div>
-      </div>
-    </div>
-
     <!-- CLIENTES -->
     <div class="sec" id="sec-clientes">
       <div class="topbar"><h1>Clientes / Fiado</h1><button class="btn acc" onclick="openModal('cliente-fiado')">+ Novo cliente</button></div>
@@ -644,13 +616,6 @@ tr:hover td{background:var(--bg2)}
 
           </div>
         </div>
-        <!-- MERCADO PAGO (PIX AUTOMATICO) -->
-        <div class="lcard" style="margin-top:16px">
-          <h3 style="margin-bottom:8px">&#x1F4B3; Pix automático (Mercado Pago)</h3>
-          <p style="margin:0 0 14px;color:var(--muted,#888);font-size:13px">Conecte sua conta Mercado Pago para gerar QR Code de Pix direto no PDV e ter a baixa automática das vendas quando o cliente pagar.</p>
-          <div class="lrow"><span>Status da conexão</span><span id="mp-status" class="tag out">Não conectado</span></div>
-          <button class="btn acc" id="mp-btn-conectar" style="width:100%;justify-content:center;margin-top:8px" onclick="conectarMercadoPago()">&#x1F517; Conectar Mercado Pago</button>
-        </div>
         <!-- STATUS DAS CONFIGS -->
         <div class="lcard" style="margin-top:16px">
           <h3 style="margin-bottom:14px">&#x2705; Status das configurações</h3>
@@ -684,14 +649,6 @@ tr:hover td{background:var(--bg2)}
           <div class="sa-card"><div class="val" style="color:var(--purple)" id="sa-rec">R$ 0</div><div class="lbl">Receita mensal</div></div>
         </div>
         <div id="clientes-list"><div class="loading"><div class="spin"></div>Carregando...</div></div>
-      </div>
-    </div>
-
-    <!-- LEADS -->
-    <div class="sec" id="sec-leads">
-      <div class="topbar"><h1>Leads da Landing Page</h1></div>
-      <div class="sec-body">
-        <div class="tbl"><table><thead><tr><th>Data</th><th>Nome</th><th>Email</th><th>WhatsApp</th></tr></thead><tbody id="leads-tb"><tr><td colspan="4"><div class="empty">Carregando...</div></td></tr></tbody></table></div>
       </div>
     </div>
 
@@ -755,7 +712,21 @@ tr:hover td{background:var(--bg2)}
     <div class="fgrid c1"><div class="fg"><label>Nome</label><input type="text" id="np-n" placeholder="Ex: Agua Mineral 500ml"></div></div>
     <div class="fgrid c3">
       <div class="fg"><label>Codigo de barras</label><input type="text" id="np-c" placeholder="7891234567890"></div>
-      <div class="fg"><label>Categoria</label><select id="np-cat"></select></div>
+      <div class="fg"><label>Categoria</label><select id="np-cat"><option>Bebidas</option>
+<option>Energeticos</option>
+<option>Snacks e Salgadinhos</option>
+<option>Chocolates e Doces</option>
+<option>Laticinios</option>
+<option>Alimentacao Rapida</option>
+<option>Tabacaria</option>
+<option>Higiene Pessoal</option>
+<option>Preservativos</option>
+<option>Medicamentos OTC</option>
+<option>Limpeza</option>
+<option>Eletronicos e Acessorios</option>
+<option>Recarga e Servicos</option>
+<option>Loteria e Jogos</option>
+<option>Outros</option></select></div>
       <div class="fg"><label>Emoji</label><input type="text" id="np-e" placeholder="🥤" maxlength="2"></div>
     </div>
     <div class="fgrid c3">
@@ -907,22 +878,8 @@ tr:hover td{background:var(--bg2)}
       <div class="fg"><label>Email</label><input type="email" id="nc-email" placeholder="jose@email.com"></div>
       <div class="fg"><label>Telefone</label><input type="text" id="nc-tel" placeholder="(11) 99999-9999"></div>
     </div>
-    <div class="fgrid c2">
-      <div class="fg"><label>Plano contratado pelo cliente</label><select id="nc-plano" onchange="aplicarPadraoPlano()"><option value="basico">Basico</option><option value="profissional">Profissional</option><option value="premium">Premium</option></select></div>
-      <div class="fg"><label>Proximo vencimento</label><input type="date" id="nc-venc"></div>
-    </div>
-    <div style="font-size:10px;color:var(--txt3);margin:12px 0 9px;text-transform:uppercase;letter-spacing:.4px;font-weight:600">Funcionalidades liberadas (padrao do plano, ajuste se quiser dar algo a mais)</div>
-    <div class="func-grid" id="nc-func-grid"></div>
+    <div class="fgrid c2"><div class="fg"><label>Plano</label><select id="nc-plano"><option value="basico">Basico</option><option value="profissional">Profissional</option><option value="premium">Premium</option></select></div></div>
     <div class="modal-ft"><button class="btn" onclick="closeModals()">Cancelar</button><button class="btn acc" onclick="addSaCliente()">Cadastrar</button></div>
-  </div>
-</div>
-
-<!-- AVISO DE PAGAMENTO EM ATRASO -->
-<div class="ov" id="ov-aviso-pagamento" onclick="if(event.target===this)fecharAvisoPagamento()">
-  <div class="modal" style="max-width:420px;border-color:var(--yellow)">
-    <h2 style="color:var(--yellow)">&#x26A0; Pagamento em atraso</h2>
-    <p style="font-size:14px;color:var(--txt2);line-height:1.6;margin-bottom:6px" id="aviso-pagamento-texto"></p>
-    <div class="modal-ft"><button class="btn acc" onclick="fecharAvisoPagamento()">Entendi, fechar</button></div>
   </div>
 </div>
 
@@ -996,19 +953,18 @@ tr:hover td{background:var(--bg2)}
       <div style="font-size:36px;margin-bottom:6px">&#x1F4F1;</div>
       <h2>Pagamento via PIX</h2>
       <div style="font-size:22px;font-weight:800;color:var(--green);margin:10px 0" id="pix-total">R$ 0,00</div>
-      <p style="font-size:12px;color:var(--txt2);margin-bottom:10px" id="pix-instrucao">Escaneie o QR Code ou copie a chave PIX</p>
+      <p style="font-size:12px;color:var(--txt2);margin-bottom:10px">Escaneie o QR Code ou copie a chave PIX</p>
       <canvas id="pix-qrcode"></canvas>
-      <img id="pix-qrcode-img" style="display:none;max-width:220px;width:100%;border-radius:8px" />
-      <div style="font-size:12px;color:var(--txt3);margin-bottom:6px" id="pix-chave-label">Chave PIX configurada:</div>
+      <div style="font-size:12px;color:var(--txt3);margin-bottom:6px">Chave PIX configurada:</div>
       <div class="pix-code" id="pix-chave-display">Configure a chave PIX nas configuracoes</div>
-      <button class="btn acc" style="width:100%;justify-content:center;margin-bottom:8px" id="pix-btn-copiar" onclick="copiarPIX()">&#x1F4CB; Copiar chave PIX</button>
-      <div style="background:var(--green-dim);border:1px solid rgba(62,207,142,.3);border-radius:var(--rad);padding:10px;font-size:12px;color:var(--green);margin-bottom:10px;display:none" id="pix-aguardando">
-        &#x23F3; Aguardando confirmacao automatica do pagamento...
+      <button class="btn acc" style="width:100%;justify-content:center;margin-bottom:8px" onclick="copiarPIX()">&#x1F4CB; Copiar chave PIX</button>
+      <div style="background:var(--green-dim);border:1px solid rgba(62,207,142,.3);border-radius:var(--rad);padding:10px;font-size:12px;color:var(--green);margin-bottom:10px" id="pix-confirmacao" style="display:none">
+        Apos confirmar o pagamento no celular, clique em confirmar abaixo
       </div>
     </div>
-    <div class="modal-ft" id="pix-modal-ft">
-      <button class="btn" onclick="fecharModalPIX()">Cancelar</button>
-      <button class="btn grn" id="pix-btn-manual" onclick="confirmarPay('PIX');closeModals()">&#x2713; Confirmar PIX recebido</button>
+    <div class="modal-ft">
+      <button class="btn" onclick="closeModals()">Cancelar</button>
+      <button class="btn grn" onclick="confirmarPay('PIX');closeModals()">&#x2713; Confirmar PIX recebido</button>
     </div>
   </div>
 </div>
@@ -1087,23 +1043,8 @@ const SKEY='sb_publishable_DeHWabj6Oh13qkMB7KzNfQ_5e6ZW9Fm'
 const {createClient}=supabase
 const db=createClient(SURL,SKEY)
 
-// Login automatico modo demonstracao (vindo da landing page)
-;(function(){
-  var params=new URLSearchParams(location.search)
-  if(params.get('demo')==='1'){
-    document.getElementById('login-email').value='visitante@convenfacil.com.br'
-    document.getElementById('login-senha').value='testegratis2026'
-    doLogin()
-  }
-})()
-
 let prods=[],cart=[],cartSnapshot=[],catA='Todos',promos=[],userLogado=null,payMetodo=null
 let excecoes=[]
-let activeClienteId=null  // id do cliente (loja) cujos dados estao sendo visualizados
-let activeClienteNome=''
-let clienteFuncs=null // funcionalidades liberadas para o cliente logado (null = sem restricao)
-let avisoPagamentoDias=null
-let avisoPagamentoDataLimite=null
 
 const FUNCIONALIDADES=[
   {key:'pdv',label:'PDV',ic:'&#x1F6D2;'},
@@ -1141,114 +1082,18 @@ async function doLogin(){
   try{
     const {data,error}=await db.from('usuarios').select('*').eq('email',email).eq('senha',senha).eq('ativo',true).single()
     if(error||!data){err.textContent='Email ou senha incorretos';err.style.display='block';btn.textContent='Entrar no sistema';btn.disabled=false;return}
-    userLogado=data
-    if(userLogado.nivel==='superadmin'){
-      // Master nao pertence a nenhuma loja especifica: precisa escolher qual cliente acessar
-      mostrarSeletorCliente()
-    } else {
-      // Verifica se a empresa (cliente) esta ativa e em dia com o pagamento
-      avisoPagamentoDias=null
-      if(userLogado.cliente_id){
-        var clienteRes=await db.from('clientes').select('ativo,proximo_vencimento').eq('id',userLogado.cliente_id).single()
-        if(clienteRes.data && clienteRes.data.ativo===false){
-          err.textContent='Acesso suspenso. Fale com o suporte para regularizar.'
-          err.style.display='block';btn.textContent='Entrar no sistema';btn.disabled=false
-          userLogado=null
-          return
-        }
-        if(clienteRes.data && clienteRes.data.proximo_vencimento){
-          var venc=new Date(clienteRes.data.proximo_vencimento+'T00:00:00')
-          var hoje=new Date();hoje.setHours(0,0,0,0)
-          var dias=Math.floor((hoje-venc)/86400000)
-          if(dias>0){
-            avisoPagamentoDias=dias
-            var dataLimite=new Date(venc.getTime()+5*86400000)
-            avisoPagamentoDataLimite=dataLimite.toLocaleDateString('pt-BR')
-          }
-        }
-      }
-      activeClienteId=userLogado.cliente_id||null
-      activeClienteNome=''
-      await loadFuncionalidades()
-      iniciarApp()
-    }
+    userLogado=data;iniciarApp()
   }catch(e){err.textContent='Erro de conexao';err.style.display='block';btn.textContent='Entrar no sistema';btn.disabled=false}
-}
-
-// FUNCIONALIDADES LIBERADAS (por plano do cliente)
-async function loadFuncionalidades(){
-  clienteFuncs=null
-  if(!activeClienteId)return
-  var res=await db.from('funcionalidades').select('*').eq('cliente_id',activeClienteId).single()
-  clienteFuncs=res.data||null // null = sem registro ainda, libera tudo por padrao
-}
-
-function mostrarAvisoPagamento(){
-  if(!avisoPagamentoDias)return
-  var txt=document.getElementById('aviso-pagamento-texto')
-  txt.textContent='Identificamos que o pagamento do sistema esta atrasado ha '+avisoPagamentoDias+' dia(s). Regularize ate '+avisoPagamentoDataLimite+' para evitar a suspensao do acesso.'
-  document.getElementById('ov-aviso-pagamento').classList.add('open')
-}
-
-function fecharAvisoPagamento(){
-  document.getElementById('ov-aviso-pagamento').classList.remove('open')
-}
-
-function ajustarMenuPorFuncionalidades(){
-  if(userLogado.nivel==='superadmin')return // Master sempre ve tudo
-  if(!clienteFuncs)return // sem registro de funcionalidades = nao restringe
-  if(!clienteFuncs.promocoes){
-    var navPromos=document.getElementById('nav-promos');if(navPromos)navPromos.style.display='none'
-  }
-  if(!clienteFuncs.financeiro){
-    var grpFin=document.getElementById('grp-fin');if(grpFin)grpFin.style.display='none'
-  }
-}
-
-// SELETOR DE CLIENTE (somente Master/superadmin)
-async function mostrarSeletorCliente(){
-  document.getElementById('login-wrap').style.display='none'
-  document.getElementById('cliente-seletor-wrap').style.display='flex'
-  var box=document.getElementById('cliente-seletor-lista')
-  box.innerHTML='Carregando...'
-  var res=await db.from('clientes').select('*').eq('ativo',true).order('nome')
-  var lista=res.data||[]
-  if(!lista.length){box.innerHTML='<div class="empty">Nenhum cliente ativo cadastrado</div>';return}
-  box.innerHTML=lista.map(function(c){
-    return '<div class="cliente-seletor-item" onclick="entrarComoCliente(\''+c.id+'\',\''+c.nome.replace(/'/g,"\\'")+'\')">'+
-      '<div class="cliente-avatar">'+c.nome.charAt(0).toUpperCase()+'</div>'+
-      '<div><div class="cliente-name">'+c.nome+'</div><div class="cliente-email">'+(c.email||'')+'</div></div>'+
-    '</div>'
-  }).join('')
-}
-
-function entrarComoCliente(clienteId,clienteNome){
-  activeClienteId=clienteId
-  activeClienteNome=clienteNome
-  document.getElementById('cliente-seletor-wrap').style.display='none'
-  iniciarApp()
-}
-
-function trocarCliente(){
-  document.getElementById('app').classList.remove('on')
-  activeClienteId=null;activeClienteNome=''
-  mostrarSeletorCliente()
 }
 
 function iniciarApp(){
   document.getElementById('login-wrap').style.display='none'
-  document.getElementById('cliente-seletor-wrap').style.display='none'
   document.getElementById('app').classList.add('on')
   document.getElementById('sf-avatar').textContent=userLogado.nome.charAt(0).toUpperCase()
   document.getElementById('sf-name').textContent=userLogado.nome
-  document.getElementById('sf-nivel').textContent=userLogado.nivel+(activeClienteNome?' · '+activeClienteNome:'')
-  var trocaBtn=document.getElementById('btn-trocar-cliente')
-  if(trocaBtn)trocaBtn.style.display=(userLogado.nivel==='superadmin')?'block':'none'
+  document.getElementById('sf-nivel').textContent=userLogado.nivel
   ajustarMenuPorNivel()
-  ajustarMenuPorFuncionalidades()
-  mostrarAvisoPagamento()
-  loadProds();loadPromos();loadCategorias()
-  carregarStatusMercadoPago()
+  loadProds();loadPromos()
   tick();setInterval(tick,30000)
 }
 
@@ -1276,7 +1121,6 @@ function ajustarMenuPorNivel(){
 
 function doLogout(){
   userLogado=null;cart=[]
-  activeClienteId=null;activeClienteNome=''
   document.getElementById('app').classList.remove('on')
   document.getElementById('login-wrap').style.display='flex'
   document.getElementById('login-email').value=''
@@ -1311,7 +1155,6 @@ function go(id,el){
   if(id==='estoque')renderEstoque()
   if(id==='fin')renderFin()
   if(id==='prods')renderProds()
-  if(id==='categorias')renderCategorias()
   if(id==='users')renderUsers()
   if(id==='promos')renderPromos()
   if(id==='pagar')renderContasPagar()
@@ -1320,7 +1163,6 @@ function go(id,el){
   if(id==='clientes')renderClientesFiado()
   if(id==='relatorio')renderRelatorio()
   if(id==='excecoes')renderExceções()
-  if(id==='leads')renderLeads()
 }
 
 // BARCODE
@@ -1342,61 +1184,15 @@ function barcodeEnter(e){
 
 // PRODUTOS
 async function loadProds(){
-  var res=await db.from('produtos').select('*').eq('cliente_id',activeClienteId).order('nome')
+  var res=await db.from('produtos').select('*').order('nome')
   prods=res.data||[]
   renderCats();renderPDV();updateBadge()
   document.getElementById('pdv-info').textContent=prods.length+' produtos'
 }
 
 async function loadPromos(){
-  var res=await db.from('promocoes').select('*').eq('cliente_id',activeClienteId)
+  var res=await db.from('promocoes').select('*')
   promos=res.data||[]
-}
-
-// CATEGORIAS
-let categorias=[]
-async function loadCategorias(){
-  var res=await db.from('categorias').select('*').eq('cliente_id',activeClienteId).order('nome')
-  categorias=res.data||[]
-}
-
-async function renderCategorias(){
-  await loadCategorias()
-  var tb=document.getElementById('categorias-tb')
-  if(!categorias.length){tb.innerHTML='<tr><td colspan="2"><div class="empty">Nenhuma categoria cadastrada</div></td></tr>';return}
-  tb.innerHTML=categorias.map(function(c){
-    return'<tr><td>'+c.nome+'</td><td><button class="btn sm red" onclick="delCategoria(\''+c.id+'\')">&#x1F5D1;</button></td></tr>'
-  }).join('')
-}
-
-async function addCategoria(){
-  var input=document.getElementById('ncat-nome')
-  var nome=input.value.trim()
-  if(!nome){toast('Informe o nome da categoria',1);return}
-  if(categorias.some(function(c){return c.nome.toLowerCase()===nome.toLowerCase()})){toast('Categoria ja existe',1);return}
-  var res=await db.from('categorias').insert({nome:nome,cliente_id:activeClienteId}).select().single()
-  if(res.error){toast('Erro ao cadastrar categoria',1);return}
-  categorias.push(res.data)
-  input.value=''
-  renderCategorias()
-  toast('Categoria cadastrada!')
-}
-
-function preencherSelectCategorias(){
-  var sel=document.getElementById('np-cat')
-  if(!categorias.length){
-    sel.innerHTML='<option value="">Nenhuma categoria cadastrada</option>'
-    return
-  }
-  sel.innerHTML=categorias.map(function(c){return'<option value="'+c.nome+'">'+c.nome+'</option>'}).join('')
-}
-
-async function delCategoria(id){
-  if(!confirm('Excluir esta categoria?'))return
-  await db.from('categorias').delete().eq('id',id)
-  categorias=categorias.filter(function(c){return c.id!==id})
-  renderCategorias()
-  toast('Categoria excluida')
 }
 
 function renderCats(){
@@ -1519,7 +1315,7 @@ function abrirConfirmar(metodo){
 }
 
 async function carregarClientesFiado(){
-  var res=await db.from('clientes_fiado').select('*').eq('cliente_id',activeClienteId).order('nome')
+  var res=await db.from('clientes_fiado').select('*').order('nome')
   var lista=res.data||[]
   var sel=document.getElementById('fiado-cliente-sel')
   sel.innerHTML='<option value="">-- Selecione ou cadastre --</option>'+lista.map(function(c){
@@ -1612,11 +1408,11 @@ function confirmarVenda(){
 async function pay(metodo,cpf,imprimirRecibo){
   if(!cart.length){toast('Adicione produtos',1);return}
   var total=cart.reduce(function(a,c){return a+Number(c.preco_final)*c.qty},0)
-  var res=await db.from('vendas').insert({total:total,forma_pagamento:metodo,cliente_id:activeClienteId}).select().single()
+  var res=await db.from('vendas').insert({total:total,forma_pagamento:metodo}).select().single()
   if(res.error){toast('Erro ao registrar venda',1);return}
   var venda=res.data
   await db.from('itens_venda').insert(cart.map(function(c){
-    return{venda_id:venda.id,produto_id:c.id,quantidade:c.qty,preco_unitario:Number(c.preco_final),cliente_id:activeClienteId}
+    return{venda_id:venda.id,produto_id:c.id,quantidade:c.qty,preco_unitario:Number(c.preco_final)}
   }))
   for(var i=0;i<cart.length;i++){
     var c=cart[i]
@@ -1774,9 +1570,9 @@ function updateBadge(){
 // FINANCEIRO
 async function renderFin(){
   var results=await Promise.all([
-    db.from('vendas').select('*').eq('cliente_id',activeClienteId).order('criado_em',{ascending:false}),
-    db.from('contas_pagar').select('valor').eq('cliente_id',activeClienteId).eq('pago',false),
-    db.from('contas_receber').select('valor').eq('cliente_id',activeClienteId).eq('recebido',false)
+    db.from('vendas').select('*').order('criado_em',{ascending:false}),
+    db.from('contas_pagar').select('valor').eq('pago',false),
+    db.from('contas_receber').select('valor').eq('recebido',false)
   ])
   var vendas=results[0].data||[]
   var totalCP=(results[1].data||[]).reduce(function(a,c){return a+Number(c.valor)},0)
@@ -1811,7 +1607,7 @@ async function renderFin(){
 
 // CONTAS A PAGAR
 async function renderContasPagar(){
-  var res=await db.from('contas_pagar').select('*').eq('cliente_id',activeClienteId).order('vencimento')
+  var res=await db.from('contas_pagar').select('*').order('vencimento')
   var contas=res.data||[]
   var hoje=new Date().toISOString().slice(0,10)
   var mes=hoje.slice(0,7)
@@ -1873,7 +1669,7 @@ function printRelPagar(periodo){
 
 // CONTAS A RECEBER
 async function renderContasReceber(){
-  var res=await db.from('contas_receber').select('*').eq('cliente_id',activeClienteId).order('vencimento')
+  var res=await db.from('contas_receber').select('*').order('vencimento')
   var contas=res.data||[]
   var hoje=new Date().toISOString().slice(0,10)
   var mes=hoje.slice(0,7)
@@ -1887,7 +1683,7 @@ async function renderContasReceber(){
   document.getElementById('cr-recebido').textContent='R$ '+recebidas.reduce(function(a,c){return a+Number(c.valor)},0).toFixed(2)
   document.getElementById('cr-recebido-count').textContent=recebidas.length+' recebidos'
   // Fiados do dia
-  var fiadosDia=await db.from('vendas').select('*').eq('cliente_id',activeClienteId).eq('forma_pagamento','Fiado').gte('criado_em',hoje)
+  var fiadosDia=await db.from('vendas').select('*').eq('forma_pagamento','Fiado').gte('criado_em',hoje)
   var fd=fiadosDia.data||[]
   var fdEl=document.getElementById('fiados-dia')
   if(!fd.length){fdEl.innerHTML='<div class="empty" style="padding:12px 0">Nenhum fiado hoje</div>'}
@@ -1932,7 +1728,7 @@ async function renderRelatorio(){
   var el=document.getElementById('rel-content')
   el.innerHTML='<div class="loading"><div class="spin"></div>Carregando...</div>'
   if(tipo==='vendas'){
-    var res=await db.from('vendas').select('*').eq('cliente_id',activeClienteId).gte('criado_em',dataInicio).order('criado_em',{ascending:false})
+    var res=await db.from('vendas').select('*').gte('criado_em',dataInicio).order('criado_em',{ascending:false})
     var vendas=res.data||[]
     var total=vendas.reduce(function(a,v){return a+Number(v.total)},0)
     el.innerHTML='<div class="mc b" style="margin-bottom:16px"><div class="lbl">Total do periodo</div><div class="val">R$ '+total.toFixed(2)+'</div><div class="sub">'+vendas.length+' vendas</div></div>'+
@@ -1940,7 +1736,7 @@ async function renderRelatorio(){
       (vendas.length?vendas.map(function(v){return'<tr><td>'+new Date(v.criado_em).toLocaleString('pt-BR')+'</td><td>'+v.forma_pagamento+'</td><td style="color:var(--green);font-weight:600">R$ '+Number(v.total).toFixed(2)+'</td></tr>'}).join(''):'<tr><td colspan="3"><div class="empty">Nenhuma venda</div></td></tr>')+
       '</tbody></table></div>'
   } else if(tipo==='pix'){
-    var res=await db.from('vendas').select('*').eq('cliente_id',activeClienteId).eq('forma_pagamento','PIX').gte('criado_em',dataInicio).order('criado_em',{ascending:false})
+    var res=await db.from('vendas').select('*').eq('forma_pagamento','PIX').gte('criado_em',dataInicio).order('criado_em',{ascending:false})
     var vendas=res.data||[]
     var total=vendas.reduce(function(a,v){return a+Number(v.total)},0)
     el.innerHTML='<div class="mc b" style="margin-bottom:16px"><div class="lbl">Total PIX no periodo</div><div class="val">R$ '+total.toFixed(2)+'</div><div class="sub">'+vendas.length+' transacoes PIX</div></div>'+
@@ -1948,7 +1744,7 @@ async function renderRelatorio(){
       (vendas.length?vendas.map(function(v){return'<tr><td>'+new Date(v.criado_em).toLocaleString('pt-BR')+'</td><td style="color:var(--green);font-weight:600">R$ '+Number(v.total).toFixed(2)+'</td></tr>'}).join(''):'<tr><td colspan="2"><div class="empty">Nenhuma transacao PIX</div></td></tr>')+
       '</tbody></table></div>'
   } else if(tipo==='pagar'){
-    var res=await db.from('contas_pagar').select('*').eq('cliente_id',activeClienteId).gte('vencimento',dataInicio).order('vencimento')
+    var res=await db.from('contas_pagar').select('*').gte('vencimento',dataInicio).order('vencimento')
     var contas=res.data||[]
     var total=contas.reduce(function(a,c){return a+Number(c.valor)},0)
     el.innerHTML='<div class="mc r" style="margin-bottom:16px"><div class="lbl">Total a pagar no periodo</div><div class="val">R$ '+total.toFixed(2)+'</div><div class="sub">'+contas.length+' contas</div></div>'+
@@ -2021,8 +1817,7 @@ function editProd(id){
   document.getElementById('np-id').value=p.id
   document.getElementById('np-n').value=p.nome
   document.getElementById('np-c').value=p.codigo_barras||''
-  preencherSelectCategorias()
-  document.getElementById('np-cat').value=p.categoria||''
+  document.getElementById('np-cat').value=p.categoria||'Bebidas'
   document.getElementById('np-e').value=p.emoji||''
   document.getElementById('np-k').value=p.preco_custo
   document.getElementById('np-v').value=p.preco_venda
@@ -2044,7 +1839,7 @@ async function delProd(id){
 
 // CLIENTES FIADO
 async function renderClientesFiado(){
-  var res=await db.from('clientes_fiado').select('*').eq('cliente_id',activeClienteId).order('nome')
+  var res=await db.from('clientes_fiado').select('*').order('nome')
   var lista=res.data||[]
   var tb=document.getElementById('clientes-tb')
   if(!lista.length){tb.innerHTML='<tr><td colspan="5"><div class="empty">Nenhum cliente cadastrado</div></td></tr>';return}
@@ -2078,7 +1873,7 @@ async function addClienteFiado(){
   var num=document.getElementById('ncf-num').value.trim()
   var obs=document.getElementById('ncf-obs').value.trim()
   if(!nome){toast('Informe o nome',1);return}
-  var res=await db.from('clientes_fiado').insert({nome:nome,telefone:tel,cpf:cpf,cep:cep,endereco:end,numero:num,observacao:obs,cliente_id:activeClienteId})
+  var res=await db.from('clientes_fiado').insert({nome:nome,telefone:tel,cpf:cpf,cep:cep,endereco:end,numero:num,observacao:obs})
   if(res.error){toast('Erro ao cadastrar cliente',1);return}
   closeModals()
   renderClientesFiado()
@@ -2089,7 +1884,7 @@ async function addClienteFiado(){
 
 // USUARIOS
 async function renderUsers(){
-  var res=await db.from('usuarios').select('*').eq('cliente_id',activeClienteId).order('nome')
+  var res=await db.from('usuarios').select('*').order('nome')
   var tb=document.getElementById('users-tb')
   if(!res.data){tb.innerHTML='<tr><td colspan="5"><div class="empty">Erro</div></td></tr>';return}
   var nl={superadmin:'Super Admin',admin:'Administrador',gerente:'Gerente',operador:'Operador'}
@@ -2107,19 +1902,6 @@ async function renderUsers(){
 async function toggleUser(id,ativo){
   await db.from('usuarios').update({ativo:!ativo}).eq('id',id)
   renderUsers();toast('Usuario '+(ativo?'desativado':'ativado'))
-}
-
-// LEADS (capturados na landing page)
-async function renderLeads(){
-  var tb=document.getElementById('leads-tb')
-  var res=await db.from('leads').select('*').order('created_at',{ascending:false})
-  var lista=res.data||[]
-  if(res.error){tb.innerHTML='<tr><td colspan="4"><div class="empty">Erro ao carregar leads</div></td></tr>';return}
-  if(!lista.length){tb.innerHTML='<tr><td colspan="4"><div class="empty">Nenhum lead ainda</div></td></tr>';return}
-  tb.innerHTML=lista.map(function(l){
-    var dt=l.created_at?new Date(l.created_at).toLocaleString('pt-BR'):''
-    return'<tr><td>'+dt+'</td><td>'+(l.nome||'')+'</td><td>'+(l.email||'')+'</td><td>'+(l.whatsapp||'-')+'</td></tr>'
-  }).join('')
 }
 
 // EXCECOES
@@ -2143,20 +1925,6 @@ async function renderSuperAdmin(){
   document.getElementById('clientes-list').innerHTML=lista.map(function(c,i){
     var f=funcs[i].data||{}
     var pc=c.plano==='premium'?'var(--purple)':c.plano==='profissional'?'var(--acc)':'var(--txt2)'
-    var diasAtraso=null
-    if(c.proximo_vencimento){
-      var venc=new Date(c.proximo_vencimento+'T00:00:00')
-      var hoje=new Date();hoje.setHours(0,0,0,0)
-      diasAtraso=Math.floor((hoje-venc)/86400000)
-    }
-    var statusPag=''
-    if(diasAtraso!==null){
-      if(diasAtraso<=0)statusPag='<span class="tag ok">Pagamento em dia</span>'
-      else if(diasAtraso<=5)statusPag='<span class="tag" style="background:var(--yellow-dim);color:var(--yellow)">&#x26A0; Atrasado '+diasAtraso+'d — avisar cliente</span>'
-      else statusPag='<span class="tag out">&#x26A0; Atrasado '+diasAtraso+'d — considerar suspender</span>'
-    }
-    var fone=(c.telefone||'').replace(/\D/g,'')
-    var btnWhats=(diasAtraso>0&&fone)?'<a class="btn sm" style="background:#25D366;color:#fff" target="_blank" href="https://wa.me/55'+fone+'?text='+encodeURIComponent('Ola '+c.nome+', identificamos que o pagamento do ConvenFacil esta em atraso ha '+diasAtraso+' dia(s). Pode regularizar para continuar usando o sistema sem interrupcoes?')+'">&#x1F4AC; Cobrar</a>':''
     return'<div class="cliente-card">'+
       '<div class="cliente-header">'+
         '<div class="cliente-info">'+
@@ -2167,10 +1935,6 @@ async function renderSuperAdmin(){
           '<span class="tag '+(c.ativo?'ok':'out')+'">'+(c.ativo?'Ativo':'Inativo')+'</span>'+
           '<button class="btn sm '+(c.ativo?'red':'grn')+'" onclick="toggleCliente(\''+c.id+'\','+c.ativo+')">'+(c.ativo?'Suspender':'Ativar')+'</button>'+
         '</div>'+
-      '</div>'+
-      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">'+
-        '<div style="font-size:12px;color:var(--txt2)">Proximo vencimento: <input type="date" value="'+(c.proximo_vencimento||'')+'" onchange="setVencimento(\''+c.id+'\',this.value)" style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--txt1);padding:3px 6px;font-size:12px"></div>'+
-        statusPag+btnWhats+
       '</div>'+
       '<div style="font-size:10px;color:var(--txt3);margin-bottom:9px;text-transform:uppercase;letter-spacing:.4px;font-weight:600">Funcionalidades liberadas</div>'+
       '<div class="func-grid">'+
@@ -2194,11 +1958,6 @@ async function toggleFunc(clienteId,funcKey,valor,funcId){
   toast((valor?'Liberado: ':'Bloqueado: ')+funcKey)
 }
 
-async function setVencimento(id,data){
-  await db.from('clientes').update({proximo_vencimento:data||null}).eq('id',id)
-  renderSuperAdmin();toast('Vencimento atualizado')
-}
-
 async function toggleCliente(id,ativo){
   await db.from('clientes').update({ativo:!ativo}).eq('id',id)
   renderSuperAdmin();toast('Cliente '+(ativo?'suspenso':'ativado'))
@@ -2211,7 +1970,6 @@ function openModal(tipo){
     document.getElementById('prod-modal-title').textContent='Cadastrar produto'
     document.getElementById('np-id').value=''
     ;['np-n','np-c','np-e','np-k','np-v','np-q','np-m'].forEach(function(id){document.getElementById(id).value=''})
-    preencherSelectCategorias()
   }
   if(tipo==='promo'){
     document.getElementById('promo-modal-title').textContent='Nova promoção'
@@ -2224,11 +1982,6 @@ function openModal(tipo){
   }
   if(tipo==='pagar')document.getElementById('ncp-venc').value=new Date().toISOString().slice(0,10)
   if(tipo==='receber')document.getElementById('ncr-venc').value=new Date().toISOString().slice(0,10)
-  if(tipo==='sa-cliente'){
-    ;['nc-nome','nc-email','nc-tel','nc-venc'].forEach(function(id){document.getElementById(id).value=''})
-    document.getElementById('nc-plano').value='basico'
-    aplicarPadraoPlano()
-  }
   var ov=document.getElementById('ov-'+tipo)
   if(ov)ov.classList.add('open')
 }
@@ -2240,7 +1993,6 @@ function closeModals(){
 // Fechar modal ao clicar no overlay
 document.addEventListener('click', function(e){
   if(e.target.classList.contains('ov') && e.target.classList.contains('open')){
-    if(e.target.id === 'ov-pix') pararPollPIX()
     e.target.classList.remove('open')
   }
 })
@@ -2262,7 +2014,6 @@ async function saveProd(){
     if(idx>=0)prods[idx]=res.data
     toast('Produto atualizado!')
   } else {
-    prod.cliente_id=activeClienteId
     var res=await db.from('produtos').insert(prod).select().single()
     if(res.error){toast('Erro ao cadastrar',1);return}
     prods.push(res.data)
@@ -2279,7 +2030,7 @@ async function savePromo(){
   var desc=document.getElementById('promo-desc').value
   var id=document.getElementById('promo-id').value
   if(!val){toast('Informe o valor',1);return}
-  var data={produto_id:prod_id,tipo:tipo,valor:val,valido_ate:ate,descricao:desc,cliente_id:activeClienteId}
+  var data={produto_id:prod_id,tipo:tipo,valor:val,valido_ate:ate,descricao:desc}
   if(id){
     await db.from('promocoes').update(data).eq('id',id)
     var idx=promos.findIndex(function(x){return x.id===id})
@@ -2300,7 +2051,7 @@ async function addUser(){
   var senha=document.getElementById('nu-senha').value
   var nivel=document.getElementById('nu-nivel').value
   if(!nome||!email||!senha){toast('Preencha todos os campos',1);return}
-  var res=await db.from('usuarios').insert({nome:nome,email:email,senha:senha,nivel:nivel,cliente_id:activeClienteId})
+  var res=await db.from('usuarios').insert({nome:nome,email:email,senha:senha,nivel:nivel})
   if(res.error){toast('Erro ao cadastrar',1);return}
   closeModals();renderUsers();toast('Usuario cadastrado!')
 }
@@ -2312,7 +2063,7 @@ async function addContaPagar(){
   var venc=document.getElementById('ncp-venc').value
   var obs=document.getElementById('ncp-obs').value
   if(!desc||!valor||!venc){toast('Preencha todos os campos',1);return}
-  var res=await db.from('contas_pagar').insert({descricao:desc,categoria:cat,valor:valor,vencimento:venc,observacao:obs,cliente_id:activeClienteId})
+  var res=await db.from('contas_pagar').insert({descricao:desc,categoria:cat,valor:valor,vencimento:venc,observacao:obs})
   if(res.error){toast('Erro',1);return}
   closeModals();renderContasPagar();toast('Conta a pagar cadastrada!')
 }
@@ -2324,32 +2075,9 @@ async function addContaReceber(){
   var venc=document.getElementById('ncr-venc').value
   var obs=document.getElementById('ncr-obs').value
   if(!desc||!cliente||!valor||!venc){toast('Preencha todos os campos',1);return}
-  var res=await db.from('contas_receber').insert({descricao:desc,cliente_nome:cliente,valor:valor,vencimento:venc,observacao:obs,cliente_id:activeClienteId})
+  var res=await db.from('contas_receber').insert({descricao:desc,cliente_nome:cliente,valor:valor,vencimento:venc,observacao:obs})
   if(res.error){toast('Erro',1);return}
   closeModals();renderContasReceber();toast('Conta a receber cadastrada!')
-}
-
-// Funcionalidades liberadas automaticamente por plano (Fase 1 do painel de controle)
-const PLANOS_FUNCIONALIDADES={
-  basico:{pdv:true,estoque:true,promocoes:false,financeiro:false,relatorios:false,multiplos_caixas:false,impressao_cupom:false,maquininha:false,whatsapp_alertas:false},
-  profissional:{pdv:true,estoque:true,promocoes:true,financeiro:true,relatorios:true,multiplos_caixas:true,impressao_cupom:true,maquininha:false,whatsapp_alertas:false},
-  premium:{pdv:true,estoque:true,promocoes:true,financeiro:true,relatorios:true,multiplos_caixas:true,impressao_cupom:true,maquininha:true,whatsapp_alertas:true}
-}
-
-function aplicarPadraoPlano(){
-  var plano=document.getElementById('nc-plano').value
-  var funcsDoPlano=PLANOS_FUNCIONALIDADES[plano]||PLANOS_FUNCIONALIDADES.basico
-  document.getElementById('nc-func-grid').innerHTML=FUNCIONALIDADES.map(function(fn){
-    var ligado=!!funcsDoPlano[fn.key]
-    return'<div class="func-item '+(ligado?'on':'')+'" id="nc-func-item-'+fn.key+'">'+
-      '<div class="func-label"><span>'+fn.ic+'</span>'+fn.label+'</div>'+
-      '<label class="toggle">'+
-        '<input type="checkbox" id="nc-func-'+fn.key+'" '+(ligado?'checked':'')+' onchange="'+
-          'document.getElementById(\'nc-func-item-'+fn.key+'\').classList.toggle(\'on\',this.checked)">'+
-        '<span class="toggle-slider"></span>'+
-      '</label>'+
-    '</div>'
-  }).join('')
 }
 
 async function addSaCliente(){
@@ -2357,16 +2085,10 @@ async function addSaCliente(){
   var email=document.getElementById('nc-email').value.trim()
   var tel=document.getElementById('nc-tel').value
   var plano=document.getElementById('nc-plano').value
-  var venc=document.getElementById('nc-venc').value||null
   if(!nome||!email){toast('Preencha nome e email',1);return}
-  var res=await db.from('clientes').insert({nome:nome,email:email,telefone:tel,plano:plano,ativo:true,proximo_vencimento:venc}).select().single()
+  var res=await db.from('clientes').insert({nome:nome,email:email,telefone:tel,plano:plano}).select().single()
   if(res.error){toast('Erro',1);return}
-  var funcsEscolhidas={}
-  FUNCIONALIDADES.forEach(function(fn){
-    var chk=document.getElementById('nc-func-'+fn.key)
-    funcsEscolhidas[fn.key]=chk?chk.checked:false
-  })
-  await db.from('funcionalidades').insert(Object.assign({cliente_id:res.data.id},funcsEscolhidas))
+  await db.from('funcionalidades').insert({cliente_id:res.data.id,pdv:true,estoque:true,promocoes:false,financeiro:false,relatorios:false,multiplos_caixas:false,impressao_cupom:false,maquininha:false,whatsapp_alertas:false})
   closeModals();renderSuperAdmin();toast('Cliente cadastrado!')
 }
 
@@ -2546,49 +2268,6 @@ function salvarConfigPix(){
 function salvarConfigImpressao(){
   localStorage.setItem('rodape_cupom',document.getElementById('cfg-rodape').value)
   toast('Configuracao de impressao salva!')
-}
-
-// MERCADO PAGO - CONEXAO OAUTH (Pix automatico por cliente)
-var MP_CLIENT_ID='3092482376472257'
-var MP_REDIRECT_URI='https://jkantpfxudbqzrtrctgp.supabase.co/functions/v1/mercadopago-oauth-callback'
-
-function conectarMercadoPago(){
-  if(!activeClienteId){toast('Nenhuma loja selecionada.');return}
-  var url='https://auth.mercadopago.com.br/authorization'
-    +'?client_id='+encodeURIComponent(MP_CLIENT_ID)
-    +'&response_type=code'
-    +'&platform_id=mp'
-    +'&state='+encodeURIComponent(activeClienteId)
-    +'&redirect_uri='+encodeURIComponent(MP_REDIRECT_URI)
-  window.location.href=url
-}
-
-async function carregarStatusMercadoPago(){
-  var el=document.getElementById('mp-status')
-  var btn=document.getElementById('mp-btn-conectar')
-  if(!el||!activeClienteId)return
-  var res=await db.from('clientes').select('mp_conectado').eq('id',activeClienteId).single()
-  var conectado=res.data&&res.data.mp_conectado
-  if(conectado){
-    el.textContent='Conectado'
-    el.className='tag ok'
-    if(btn)btn.textContent='↻ Reconectar Mercado Pago'
-  }else{
-    el.textContent='Não conectado'
-    el.className='tag out'
-    if(btn)btn.innerHTML='&#x1F517; Conectar Mercado Pago'
-  }
-}
-
-function verificarRetornoMercadoPago(){
-  var params=new URLSearchParams(window.location.search)
-  var status=params.get('mp_conectado')
-  if(!status)return
-  if(status==='ok')toast('Mercado Pago conectado com sucesso!')
-  else toast('Não foi possível conectar o Mercado Pago. Tente novamente.')
-  params.delete('mp_conectado')
-  var novaUrl=window.location.pathname+(params.toString()?'?'+params.toString():'')
-  window.history.replaceState({},'',novaUrl)
 }
 
 // ABAS DO MODAL PROMO
@@ -2916,128 +2595,21 @@ function pararCameraModal(){
 }
 
 // PIX QR CODE
-var pixPollTimer = null
-var pixVendaAtualId = null
-var pixCodigoCopiaECola = null
-
-async function abrirPIX(){
+function abrirPIX(){
   if(!cart.length){ toast('Adicione produtos ao pedido', 1); return }
   var total = cart.reduce(function(a,c){ return a + Number(c.preco_final)*c.qty }, 0)
   document.getElementById('pix-total').textContent = 'R$ ' + total.toFixed(2)
-  document.getElementById('ov-pix').classList.add('open')
-
-  // Verifica se esta loja tem Pix automatico (Mercado Pago) conectado
-  var conectado = false
-  try{
-    var resCliente = await db.from('clientes').select('mp_conectado').eq('id',activeClienteId).single()
-    conectado = !!(resCliente.data && resCliente.data.mp_conectado)
-  }catch(e){ conectado = false }
-
-  if(conectado){
-    abrirPIXAutomatico(total)
-  }else{
-    abrirPIXManual(total)
-  }
-}
-
-function abrirPIXManual(total){
-  // Fluxo manual (chave PIX estatica, confirmacao no honor system)
-  pixCodigoCopiaECola = null
-  document.getElementById('pix-instrucao').textContent = 'Escaneie o QR Code ou copie a chave PIX'
-  document.getElementById('pix-qrcode').style.display = ''
-  document.getElementById('pix-qrcode-img').style.display = 'none'
-  document.getElementById('pix-chave-label').style.display = ''
-  document.getElementById('pix-chave-display').style.display = ''
-  document.getElementById('pix-btn-copiar').style.display = ''
-  document.getElementById('pix-btn-manual').style.display = ''
-  document.getElementById('pix-aguardando').style.display = 'none'
-  var chavePix = localStorage.getItem('chave_pix') || 'convenfacil@4to.com.br'
+  // Chave PIX salva no localStorage
+  var chavePix = localStorage.getItem('chave_pix') || 'convenfacil@NinjAI'
   document.getElementById('pix-chave-display').textContent = chavePix
+  // Gerar payload PIX (formato EMV)
   var payload = gerarPayloadPIX(chavePix, total)
+  // Gerar QR Code
   var canvas = document.getElementById('pix-qrcode')
   QRCode.toCanvas(canvas, payload, {width: 220, margin: 2, color:{dark:'#000000', light:'#ffffff'}}, function(err){
     if(err) console.error(err)
   })
-}
-
-async function abrirPIXAutomatico(total){
-  document.getElementById('pix-instrucao').textContent = 'Gerando cobranca Pix...'
-  document.getElementById('pix-qrcode').style.display = 'none'
-  document.getElementById('pix-qrcode-img').style.display = 'none'
-  document.getElementById('pix-chave-label').style.display = 'none'
-  document.getElementById('pix-chave-display').style.display = 'none'
-  document.getElementById('pix-btn-copiar').style.display = 'none'
-  document.getElementById('pix-btn-manual').style.display = 'none'
-  document.getElementById('pix-aguardando').style.display = 'none'
-
-  try{
-    var resp = await fetch(SURL + '/functions/v1/criar-pix-venda', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SKEY, 'apikey': SKEY },
-      body: JSON.stringify({ cliente_id: activeClienteId, valor: total, descricao: 'Venda ConvenFacil' })
-    })
-    var data = await resp.json()
-    if(!resp.ok || !data.qr_code_base64){
-      console.error('Erro criar-pix-venda:', data)
-      toast('Erro ao gerar Pix automatico. Usando modo manual.', 1)
-      abrirPIXManual(total)
-      return
-    }
-
-    // Registra a venda como pendente (nao mexe no estoque ainda - so o webhook faz isso)
-    var resVenda = await db.from('vendas').insert({
-      total: total, forma_pagamento: 'PIX', cliente_id: activeClienteId,
-      status_pagamento: 'pendente', mp_payment_id: data.payment_id
-    }).select().single()
-    if(resVenda.error){ toast('Erro ao registrar venda', 1); return }
-    var venda = resVenda.data
-    pixVendaAtualId = venda.id
-    await db.from('itens_venda').insert(cart.map(function(c){
-      return{venda_id:venda.id,produto_id:c.id,quantidade:c.qty,preco_unitario:Number(c.preco_final),cliente_id:activeClienteId}
-    }))
-    cartSnapshot = cart.slice()
-
-    pixCodigoCopiaECola = data.qr_code
-    document.getElementById('pix-instrucao').textContent = 'Escaneie o QR Code no app do seu banco'
-    var img = document.getElementById('pix-qrcode-img')
-    img.src = 'data:image/png;base64,' + data.qr_code_base64
-    img.style.display = ''
-    document.getElementById('pix-chave-label').style.display = ''
-    document.getElementById('pix-chave-label').textContent = 'Pix copia e cola:'
-    document.getElementById('pix-chave-display').style.display = ''
-    document.getElementById('pix-chave-display').textContent = data.qr_code
-    document.getElementById('pix-btn-copiar').style.display = ''
-    document.getElementById('pix-aguardando').style.display = ''
-
-    iniciarPollPIX(venda.id)
-  }catch(e){
-    console.error(e)
-    toast('Erro ao gerar Pix automatico. Usando modo manual.', 1)
-    abrirPIXManual(total)
-  }
-}
-
-function iniciarPollPIX(vendaId){
-  pararPollPIX()
-  pixPollTimer = setInterval(async function(){
-    var res = await db.from('vendas').select('status_pagamento').eq('id',vendaId).single()
-    if(res.data && res.data.status_pagamento === 'pago'){
-      pararPollPIX()
-      toast('Pagamento Pix confirmado!')
-      closeModals()
-      cart=[];renderCart();renderPDV();updateBadge()
-      loadProds()
-    }
-  }, 3000)
-}
-
-function pararPollPIX(){
-  if(pixPollTimer){ clearInterval(pixPollTimer); pixPollTimer = null }
-}
-
-function fecharModalPIX(){
-  pararPollPIX()
-  closeModals()
+  document.getElementById('ov-pix').classList.add('open')
 }
 
 function gerarPayloadPIX(chave, valor){
@@ -3076,9 +2648,9 @@ function crc16(str){
 }
 
 function copiarPIX(){
-  var valor = pixCodigoCopiaECola || localStorage.getItem('chave_pix') || 'convenfacil@4to.com.br'
-  navigator.clipboard.writeText(valor).then(function(){
-    toast(pixCodigoCopiaECola ? 'Codigo Pix copiado!' : 'Chave PIX copiada!')
+  var chave = localStorage.getItem('chave_pix') || 'convenfacil@NinjAI'
+  navigator.clipboard.writeText(chave).then(function(){
+    toast('Chave PIX copiada!')
   }).catch(function(){
     toast('Erro ao copiar', 1)
   })
@@ -3147,7 +2719,6 @@ function toast(msg,err){
 }
 
 loadProds();loadPromos()
-verificarRetornoMercadoPago()
 </script>
 </body>
 </html>
