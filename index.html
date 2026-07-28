@@ -2658,16 +2658,17 @@ function copiarPIX(){
 
 // CUPOM TERMICO
 function imprimirCupom(){
-  if(!cart.length){ toast('Adicione produtos ao pedido', 1); return }
-  var total = cart.reduce(function(a,c){ return a + Number(c.preco_final)*c.qty }, 0)
-  var orig = cart.reduce(function(a,c){ return a + Number(c.preco_venda)*c.qty }, 0)
+  var itens = cart.length ? cart : cartSnapshot
+  if(!itens || !itens.length){ toast('Adicione produtos ao pedido', 1); return }
+  var total = itens.reduce(function(a,c){ return a + Number(c.preco_final)*c.qty }, 0)
+  var orig = itens.reduce(function(a,c){ return a + Number(c.preco_venda)*c.qty }, 0)
   var desc = orig - total
   var now = new Date()
   var dt = now.toLocaleDateString('pt-BR') + ' ' + now.toLocaleTimeString('pt-BR')
   var loja = localStorage.getItem('nome_loja') || 'CONVENFACIL'
   var cnpj = localStorage.getItem('cnpj_loja') || ''
   var rodape = localStorage.getItem('rodape_cupom') || 'Obrigado pela preferencia!'
-  var linhas = cart.map(function(c){
+  var linhas = itens.map(function(c){
     var nome = c.nome.substring(0,24).padEnd(24)
     var qtd = c.qty + 'x'
     var unit = 'R$' + Number(c.preco_final).toFixed(2)
