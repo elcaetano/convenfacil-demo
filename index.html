@@ -1227,6 +1227,32 @@ const db=createClient(SURL,SKEY)
 let prods=[],cart=[],cartSnapshot=[],catA='Todos',promos=[],userLogado=null,payMetodo=null
 let excecoes=[]
 
+// Imprime um HTML sem abrir uma janela separada que fica flutuando/sobrepondo a tela.
+// Usa um iframe escondido: so aparece mesmo a caixinha nativa de impressao do navegador.
+function imprimirViaIframe(html){
+  var iframe=document.createElement('iframe')
+  iframe.style.position='fixed'
+  iframe.style.right='0'
+  iframe.style.bottom='0'
+  iframe.style.width='0'
+  iframe.style.height='0'
+  iframe.style.border='0'
+  iframe.style.visibility='hidden'
+  document.body.appendChild(iframe)
+  var doc=iframe.contentWindow.document
+  doc.open();doc.write(html);doc.close()
+  function limpar(){ if(iframe&&iframe.parentNode) iframe.parentNode.removeChild(iframe) }
+  iframe.contentWindow.onafterprint=limpar
+  setTimeout(function(){
+    try{
+      iframe.contentWindow.focus()
+      iframe.contentWindow.print()
+    }catch(e){}
+    // seguranca: se o navegador nao disparar onafterprint, remove sozinho depois de um tempo
+    setTimeout(limpar,15000)
+  },350)
+}
+
 // Registra uma excecao tanto na tela (memoria) quanto no banco (persistente, para o admin ver depois)
 // itens (opcional): array com o pedido completo, ex: [{nome,qty,preco_final,preco_venda}]
 async function registrarExcecao(acao,detalhe,valor,itens){
@@ -1743,10 +1769,7 @@ function imprimirReciboComCPF(cpf,metodo,total){
     '<div class="c" style="font-size:10px;margin-top:6px">'+rodape+'</div>'+
     '<div class="c" style="font-size:10px">ConvenFacil - convenfacil.com.br</div>'+
     '<br><br></body></html>'
-  var w=window.open('','_blank','width=320,height=600')
-  w.document.write(html)
-  w.document.close()
-  setTimeout(function(){w.print()},600)
+  imprimirViaIframe(html)
 }
 
 function clearCart(){
@@ -1924,10 +1947,7 @@ function imprimirListaCompras(){
     '<table><thead><tr><th>Produto</th><th style="text-align:center">Estoque atual</th><th style="text-align:center">Comprar</th><th>Comprado?</th></tr></thead>'+
     '<tbody>'+linhas+'</tbody></table>'+
     '</body></html>'
-  var w=window.open('','_blank')
-  w.document.write(html)
-  w.document.close()
-  setTimeout(function(){w.print()},400)
+  imprimirViaIframe(html)
 }
 
 async function restock(id){
@@ -2265,10 +2285,7 @@ function printRel(){
     '<div class="sub">Gerado em: '+now+'</div>'+
     el.innerHTML+
     '</body></html>'
-  var w = window.open('','_blank','width=900,height=700')
-  w.document.write(html)
-  w.document.close()
-  setTimeout(function(){w.print()}, 600)
+  imprimirViaIframe(html)
 }
 
 // PRODUTOS
@@ -3249,10 +3266,7 @@ function imprimirCupom(){
     '<br><br>'+
     '</body></html>'
 
-  var w = window.open('','_blank','width=320,height=600')
-  w.document.write(html)
-  w.document.close()
-  setTimeout(function(){ w.print() }, 600)
+  imprimirViaIframe(html)
 }
 
 // ============ ATENDIMENTO POR MESAS (modulo, liga/desliga por cliente) ============
@@ -3455,9 +3469,7 @@ async function imprimirItensNovosComanda(){
     '<div class="c" style="font-size:10px">Garcom: '+userLogado.nome+'</div>'+
     '<script>window.onafterprint=function(){window.close()}<\/script>'+
     '</body></html>'
-  var w=window.open('','_blank','width=320,height=600')
-  w.document.write(html);w.document.close()
-  setTimeout(function(){w.print()},500)
+  imprimirViaIframe(html)
   var idsImpressos=novos.map(function(it){return it.id})
   await db.from('itens_comanda').update({impresso:true}).in('id',idsImpressos)
 }
@@ -3520,9 +3532,7 @@ function imprimirFechamentoComanda(metodo,total){
     '<div class="linha"></div><div class="c" style="font-size:10px">'+rodape+'</div>'+
     '<script>window.onafterprint=function(){window.close()}<\/script>'+
     '</body></html>'
-  var w=window.open('','_blank','width=320,height=600')
-  w.document.write(html);w.document.close()
-  setTimeout(function(){w.print()},500)
+  imprimirViaIframe(html)
 }
 
 // KDS — painel da cozinha
