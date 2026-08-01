@@ -760,7 +760,7 @@ tr:hover td{background:var(--bg2)}
     <div class="fgrid c1"><div class="fg"><label>Nome</label><input type="text" id="np-n" placeholder="Ex: Agua Mineral 500ml"></div></div>
     <div class="fgrid c3">
       <div class="fg"><label>Codigo de barras</label><input type="text" id="np-c" placeholder="7891234567890"></div>
-      <div class="fg"><label>Categoria</label><select id="np-cat"></select></div>
+      <div class="fg"><label>Categoria</label><div style="display:flex;gap:6px"><select id="np-cat" style="flex:1;min-width:0"></select><button type="button" class="btn" style="padding:7px 10px;flex-shrink:0" title="Nova categoria" onclick="abrirCategoriaRapida()">&#x2795;</button></div></div>
       <div class="fg"><label>Emoji</label><input type="text" id="np-e" placeholder="🥤" maxlength="2"></div>
     </div>
     <div class="fgrid c3">
@@ -1096,6 +1096,15 @@ tr:hover td{background:var(--bg2)}
       <button class="btn" onclick="closeModals()">Cancelar</button>
       <button class="btn grn" onclick="confirmarVenda()">&#x2713; Confirmar e encerrar</button>
     </div>
+  </div>
+</div>
+
+<!-- MODAL NOVA CATEGORIA RAPIDA (a partir do cadastro de produto) -->
+<div class="ov" id="ov-cat-rapida">
+  <div class="modal" style="max-width:360px">
+    <h2>&#x1F4C1; Nova categoria</h2>
+    <div class="fgrid c1"><div class="fg"><label>Nome da categoria</label><input type="text" id="cat-rapida-nome" placeholder="Ex: Padaria" onkeydown="if(event.key==='Enter')confirmarCategoriaRapida()"></div></div>
+    <div class="modal-ft"><button class="btn" onclick="document.getElementById('ov-cat-rapida').classList.remove('open')">Cancelar</button><button class="btn acc" onclick="confirmarCategoriaRapida()">&#x2795; Adicionar</button></div>
   </div>
 </div>
 
@@ -1825,6 +1834,31 @@ async function renderCategorias(){
   }).join('')
 }
 
+function abrirCategoriaRapida(){
+  document.getElementById('cat-rapida-nome').value=''
+  document.getElementById('ov-cat-rapida').classList.add('open')
+  setTimeout(function(){document.getElementById('cat-rapida-nome').focus()},100)
+}
+
+async function confirmarCategoriaRapida(){
+  var nome=document.getElementById('cat-rapida-nome').value.trim()
+  if(!nome){toast('Informe o nome da categoria',1);return}
+  var existe=categoriasCache.find(function(c){return c.nome.toLowerCase()===nome.toLowerCase()})
+  if(existe){
+    document.getElementById('ov-cat-rapida').classList.remove('open')
+    document.getElementById('np-cat').value=existe.nome
+    toast('Categoria ja existia, selecionada')
+    return
+  }
+  var res=await db.from('categorias').insert({nome:nome})
+  if(res.error){toast('Erro ao cadastrar categoria',1);return}
+  await carregarCategorias()
+  preencherSelectCategorias()
+  document.getElementById('np-cat').value=nome
+  document.getElementById('ov-cat-rapida').classList.remove('open')
+  toast('Categoria cadastrada!')
+}
+
 async function addCategoria(){
   var nome=document.getElementById('cat-nova-nome').value.trim()
   if(!nome){toast('Informe o nome da categoria',1);return}
@@ -2516,6 +2550,7 @@ function imprimirCartaz(promoId, soPreview){
       '</div>'+
       '<div class="rodape">CONVÊNFÁCIL &mdash; '+new Date().toLocaleDateString('pt-BR')+'</div>'+
     '</div>'+
+    '<script>window.onafterprint=function(){window.close()}<\/script>'+
     '</body></html>'
   var w=window.open('','_blank','width=800,height=1100')
   w.document.write(html)
