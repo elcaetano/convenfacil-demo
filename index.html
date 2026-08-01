@@ -1185,16 +1185,6 @@ tr:hover td{background:var(--bg2)}
   </div>
 </div>
 
-<!-- MODAL CANCELAR ITEM DA COMANDA -->
-<div class="ov" id="ov-cancelar-item">
-  <div class="modal" style="max-width:380px">
-    <h2>&#x1F5D1; Cancelar item</h2>
-    <div class="fgrid c1"><div class="fg"><label>Motivo</label><input type="text" id="ci-motivo" placeholder="Ex: cliente desistiu, item errado..."></div></div>
-    <div class="fgrid c1"><div class="fg"><label>Senha do gerente/admin</label><input type="password" id="ci-senha" placeholder="••••••"></div></div>
-    <div class="modal-ft"><button class="btn" onclick="closeModals()">Cancelar</button><button class="btn red" onclick="confirmarCancelarItem()">Confirmar cancelamento</button></div>
-  </div>
-</div>
-
 <!-- MODAL FECHAR COMANDA -->
 <div class="ov" id="ov-fechar-comanda">
   <div class="modal" style="max-width:400px;text-align:center">
@@ -3375,7 +3365,7 @@ async function renderComanda(){
       '</div>'+
       '<span style="font-size:11px;font-weight:700;color:'+(statusCor[it.status]||'var(--txt3)')+';text-transform:uppercase">'+(statusLabel[it.status]||it.status)+'</span>'+
       '<div style="font-size:13px;font-weight:700;color:var(--acc);min-width:70px;text-align:right">R$ '+subtotal.toFixed(2)+'</div>'+
-      (it.status!=='cancelado'&&it.status!=='entregue'?'<button class="btn sm red" onclick="abrirCancelarItem(\''+it.id+'\')">Cancelar</button>':'')+
+      (it.status!=='cancelado'&&it.status!=='entregue'?'<button class="btn sm red" onclick="cancelarItemSilencioso(\''+it.id+'\')">Cancelar</button>':'')+
     '</div>'
   }).join('')
   var total=itensComandaCache.filter(function(it){return it.status!=='cancelado'}).reduce(function(a,it){return a+Number(it.preco_unit)*it.qtd},0)
@@ -3463,30 +3453,15 @@ async function imprimirItensNovosComanda(){
   await db.from('itens_comanda').update({impresso:true}).in('id',idsImpressos)
 }
 
-// Cancelamento de item (nunca deleta — soft cancel + senha de gerente + registra em excecoes)
-var itemParaCancelarId=null
-function abrirCancelarItem(itemId){
-  itemParaCancelarId=itemId
-  document.getElementById('ci-motivo').value=''
-  document.getElementById('ci-senha').value=''
-  document.getElementById('ov-cancelar-item').classList.add('open')
-}
-
-async function confirmarCancelarItem(){
-  var motivo=document.getElementById('ci-motivo').value.trim()
-  var senha=document.getElementById('ci-senha').value
-  if(!motivo){toast('Informe o motivo',1);return}
-  if(!senha){toast('Informe a senha',1);return}
-  var res=await db.from('usuarios').select('*').eq('senha',senha).eq('ativo',true).in('nivel',['gerente','admin','superadmin']).limit(1)
-  var gerente=(res.data&&res.data[0])
-  if(!gerente){toast('Senha invalida',1);return}
-  var item=itensComandaCache.find(function(x){return x.id===itemParaCancelarId})
-  await db.from('itens_comanda').update({status:'cancelado',cancelado_motivo:motivo,cancelado_por:userLogado.nome,cancelado_em:new Date().toISOString()}).eq('id',itemParaCancelarId)
-  document.getElementById('ov-cancelar-item').classList.remove('open')
-  if(item){
-    registrarExcecao('ITEM DE COMANDA CANCELADO',item.qtd+'x '+item.produto_nome+' — Motivo: '+motivo+' (autorizado por '+gerente.nome+')',Number(item.preco_unit)*item.qtd)
-  }
-  toast('Item cancelado')
+// Cancelamento de item — nunca deleta do banco (soft cancel), mas pro operador se comporta
+// como se o item tivesse simplesmente sumido: sem pedir motivo, sem pedir senha, sem aviso.
+// A excecao fica registrada por baixo dos panos pro admin ver depois (mesma regra do "Limpar pedido").
+async function cancelarItemSilencioso(itemId){
+  var item=itensComandaCache.find(function(x){return x.id===itemId})
+  if(!item)return
+  await db.from('itens_comanda').update({status:'cancelado',cancelado_por:userLogado.nome,cancelado_em:new Date().toISOString()}).eq('id',itemId)
+  var m=mesasCache.find(function(x){return x.id===mesaAtualId})
+  registrarExcecao('ITEM DE COMANDA CANCELADO',(m?'Mesa '+m.numero+' — ':'')+item.qtd+'x '+item.produto_nome,Number(item.preco_unit)*item.qtd)
   renderComanda()
 }
 
