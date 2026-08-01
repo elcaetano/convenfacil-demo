@@ -1133,12 +1133,13 @@ let prods=[],cart=[],cartSnapshot=[],catA='Todos',promos=[],userLogado=null,payM
 let excecoes=[]
 
 // Registra uma excecao tanto na tela (memoria) quanto no banco (persistente, para o admin ver depois)
-async function registrarExcecao(acao,detalhe,valor){
+// itens (opcional): array com o pedido completo, ex: [{nome,qty,preco_final,preco_venda}]
+async function registrarExcecao(acao,detalhe,valor,itens){
   var nomeUser=(userLogado&&userLogado.nome)||'Desconhecido'
-  excecoes.unshift({dt:new Date().toLocaleString('pt-BR'),user:nomeUser,acao:acao,detalhe:detalhe})
+  excecoes.unshift({dt:new Date().toLocaleString('pt-BR'),user:nomeUser,acao:acao,detalhe:detalhe,itens:itens||null})
   if(document.getElementById('sec-excecoes'))renderExceções()
   try{
-    await db.from('excecoes').insert({usuario_nome:nomeUser,acao:acao,detalhe:detalhe,valor:valor||null})
+    await db.from('excecoes').insert({usuario_nome:nomeUser,acao:acao,detalhe:detalhe,valor:valor||null,itens:itens||null})
   }catch(e){ /* nao bloquear o fluxo do usuario se o insert falhar */ }
 }
 
@@ -1146,7 +1147,7 @@ async function carregarExcecoes(){
   var res=await db.from('excecoes').select('*').order('criado_em',{ascending:false}).limit(200)
   if(res.data){
     excecoes=res.data.map(function(e){
-      return{dt:new Date(e.criado_em).toLocaleString('pt-BR'),user:e.usuario_nome||'Desconhecido',acao:e.acao,detalhe:e.detalhe}
+      return{dt:new Date(e.criado_em).toLocaleString('pt-BR'),user:e.usuario_nome||'Desconhecido',acao:e.acao,detalhe:e.detalhe,itens:e.itens||null}
     })
   }
 }
@@ -1631,7 +1632,10 @@ function clearCart(){
   if(cart.length){
     var total=cart.reduce(function(a,c){return a+Number(c.preco_final)*c.qty},0)
     var itensDesc=cart.map(function(c){return c.qty+'x '+c.nome}).join(', ')
-    registrarExcecao('PEDIDO LIMPO COM ITENS', itensDesc+' — Total R$ '+total.toFixed(2), total)
+    var itensCompletos=cart.map(function(c){
+      return{nome:c.nome,qty:c.qty,preco_venda:Number(c.preco_venda),preco_final:Number(c.preco_final),subtotal:Number(c.preco_final)*c.qty}
+    })
+    registrarExcecao('PEDIDO LIMPO COM ITENS', itensDesc+' — Total R$ '+total.toFixed(2), total, itensCompletos)
   }
   cart=[];renderCart()
 }
@@ -2294,9 +2298,26 @@ async function toggleUser(id,ativo){
 function renderExceções(){
   var tb=document.getElementById('excecoes-tb')
   if(!excecoes.length){tb.innerHTML='<tr><td colspan="4"><div class="empty">Nenhuma excecao registrada</div></td></tr>';return}
-  tb.innerHTML=excecoes.map(function(e){
-    return'<tr><td>'+e.dt+'</td><td>'+e.user+'</td><td style="color:var(--red);font-weight:600">'+e.acao+'</td><td>'+e.detalhe+'</td></tr>'
+  tb.innerHTML=excecoes.map(function(e,i){
+    var temItens=e.itens&&e.itens.length
+    var principal='<tr><td>'+e.dt+'</td><td>'+e.user+'</td><td style="color:var(--red);font-weight:600">'+e.acao+'</td><td>'+e.detalhe+
+      (temItens?' <button class="btn sm" style="margin-left:6px;padding:2px 8px" onclick="toggleExcecaoItens('+i+')">Ver pedido completo</button>':'')+
+      '</td></tr>'
+    var detalheItens=''
+    if(temItens){
+      var linhasItens=e.itens.map(function(it){
+        return'<tr><td style="padding:3px 8px;color:var(--txt2)">'+it.qty+'x '+it.nome+'</td><td style="padding:3px 8px;text-align:right;color:var(--txt2)">R$ '+Number(it.subtotal).toFixed(2)+'</td></tr>'
+      }).join('')
+      detalheItens='<tr id="exc-itens-'+i+'" style="display:none"><td colspan="4" style="background:var(--bg2);padding:8px 12px"><table style="width:100%;font-size:12px">'+linhasItens+'</table></td></tr>'
+    }
+    return principal+detalheItens
   }).join('')
+}
+
+function toggleExcecaoItens(i){
+  var row=document.getElementById('exc-itens-'+i)
+  if(!row)return
+  row.style.display = row.style.display==='none' ? '' : 'none'
 }
 
 // SUPER ADMIN
