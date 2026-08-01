@@ -2454,18 +2454,23 @@ async function addClienteFiado(){
 }
 
 // USUARIOS
+var usersCache=[]
 async function renderUsers(){
   var res=await db.from('usuarios').select('*').order('nome')
+  usersCache=res.data||[]
   var tb=document.getElementById('users-tb')
   if(!res.data){tb.innerHTML='<tr><td colspan="5"><div class="empty">Erro</div></td></tr>';return}
   var nl={superadmin:'Master',admin:'Administrador',gerente:'Gerente',operador:'Operador'}
   tb.innerHTML=res.data.map(function(u){
+    var protegido=u.email==='admin@convenfacil.com.br'||(userLogado&&u.id===userLogado.id)
     return'<tr>'+
       '<td><strong>'+u.nome+'</strong></td>'+
       '<td style="color:var(--txt2)">'+u.email+'</td>'+
       '<td><span class="nivel-badge nivel-'+u.nivel+'">'+(nl[u.nivel]||u.nivel)+'</span></td>'+
       '<td><span class="tag '+(u.ativo?'ok':'out')+'">'+(u.ativo?'Ativo':'Inativo')+'</span></td>'+
-      '<td>'+(u.email!=='admin@convenfacil.com.br'?'<button class="btn sm '+(u.ativo?'red':'grn')+'" onclick="toggleUser(\''+u.id+'\','+u.ativo+')">'+(u.ativo?'Desativar':'Ativar')+'</button>':'')+
+      '<td style="display:flex;gap:6px">'+
+      (protegido?'':'<button class="btn sm '+(u.ativo?'red':'grn')+'" onclick="toggleUser(\''+u.id+'\','+u.ativo+')">'+(u.ativo?'Desativar':'Ativar')+'</button>'+
+        '<button class="btn sm red" onclick="delUsuario(\''+u.id+'\')" title="Excluir usuario">&#x1F5D1;</button>')+
       '</td></tr>'
   }).join('')
 }
@@ -2473,6 +2478,18 @@ async function renderUsers(){
 async function toggleUser(id,ativo){
   await db.from('usuarios').update({ativo:!ativo}).eq('id',id)
   renderUsers();toast('Usuario '+(ativo?'desativado':'ativado'))
+}
+
+async function delUsuario(id){
+  var u=usersCache.find(function(x){return x.id===id})
+  if(!u)return
+  if(u.email==='admin@convenfacil.com.br'||(userLogado&&u.id===userLogado.id)){toast('Nao e possivel excluir esse usuario',1);return}
+  confirmDialog('Excluir o usuario "'+u.nome+'" ('+u.email+')? Essa acao nao pode ser desfeita.', async function(){
+    await db.from('usuarios').delete().eq('id',id)
+    registrarExcecao('USUARIO EXCLUIDO', u.nome+' ('+u.email+') - nivel '+u.nivel, 0)
+    renderUsers()
+    toast('Usuario excluido')
+  }, {titulo:'Excluir usuario?', icone:'👤'})
 }
 
 // EXCECOES
