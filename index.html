@@ -1131,6 +1131,25 @@ const db=createClient(SURL,SKEY)
 
 let prods=[],cart=[],cartSnapshot=[],catA='Todos',promos=[],userLogado=null,payMetodo=null
 let excecoes=[]
+
+// Registra uma excecao tanto na tela (memoria) quanto no banco (persistente, para o admin ver depois)
+async function registrarExcecao(acao,detalhe,valor){
+  var nomeUser=(userLogado&&userLogado.nome)||'Desconhecido'
+  excecoes.unshift({dt:new Date().toLocaleString('pt-BR'),user:nomeUser,acao:acao,detalhe:detalhe})
+  if(document.getElementById('sec-excecoes'))renderExceções()
+  try{
+    await db.from('excecoes').insert({usuario_nome:nomeUser,acao:acao,detalhe:detalhe,valor:valor||null})
+  }catch(e){ /* nao bloquear o fluxo do usuario se o insert falhar */ }
+}
+
+async function carregarExcecoes(){
+  var res=await db.from('excecoes').select('*').order('criado_em',{ascending:false}).limit(200)
+  if(res.data){
+    excecoes=res.data.map(function(e){
+      return{dt:new Date(e.criado_em).toLocaleString('pt-BR'),user:e.usuario_nome||'Desconhecido',acao:e.acao,detalhe:e.detalhe}
+    })
+  }
+}
 let _confirmCb=null
 
 // Modal de confirmacao generico (substitui window.confirm)
@@ -1272,7 +1291,7 @@ function go(id,el){
   if(id==='superadmin')renderSuperAdmin()
   if(id==='clientes')renderClientesFiado()
   if(id==='relatorio')renderRelatorio()
-  if(id==='excecoes')renderExceções()
+  if(id==='excecoes')carregarExcecoes().then(renderExceções)
 }
 
 // BARCODE
@@ -1608,7 +1627,19 @@ function imprimirReciboComCPF(cpf,metodo,total){
   setTimeout(function(){w.print()},600)
 }
 
-function clearCart(){cart=[];renderCart()}
+function clearCart(){
+  if(!cart.length){cart=[];renderCart();return}
+  var total=cart.reduce(function(a,c){return a+Number(c.preco_final)*c.qty},0)
+  var itensDesc=cart.map(function(c){return c.qty+'x '+c.nome}).join(', ')
+  confirmDialog(
+    'Este pedido tem R$ '+total.toFixed(2)+' em itens. Isso sera registrado nas Excecoes para o admin conferir. Confirma?',
+    function(){
+      registrarExcecao('PEDIDO LIMPO COM ITENS', itensDesc+' — Total R$ '+total.toFixed(2), total)
+      cart=[];renderCart()
+    },
+    {titulo:'Limpar pedido com itens?', okLabel:'\u{1F5D1} Limpar mesmo assim'}
+  )
+}
 
 // PROMOÇÕES
 function renderPromos(){
@@ -2165,8 +2196,7 @@ async function delProd(id){
   if(!p)return
   confirmDialog('Excluir "'+p.nome+'"?', async function(){
     await db.from('produtos').delete().eq('id',id)
-    // Registrar excecao
-    excecoes.unshift({dt:new Date().toLocaleString('pt-BR'),user:userLogado.nome,acao:'EXCLUSAO DE PRODUTO',detalhe:p.nome+' - R$ '+Number(p.preco_venda).toFixed(2)})
+    registrarExcecao('EXCLUSAO DE PRODUTO', p.nome+' - R$ '+Number(p.preco_venda).toFixed(2), p.preco_venda)
     prods=prods.filter(function(x){return x.id!==id});renderProds();renderPDV();renderCats();updateBadge()
     toast('Produto excluido')
   })
