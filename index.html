@@ -385,6 +385,7 @@ tr:hover td{background:var(--bg2)}
           <span class="arrow">&#x25B6;</span>
         </div>
         <div class="nav-items" id="grp-estoque-items">
+          <div class="nav-item" id="nav-prods" onclick="go('prods',this)"><span class="nav-ic">&#x1F3F7;</span><span>Produtos</span></div>
           <div class="nav-item" id="nav-add-prod" onclick="go('estoque',document.getElementById('nav-estoque'));openModal('prod')"><span class="nav-ic">&#x2795;</span><span>Adicionar produto</span></div>
           <div class="nav-item" id="nav-baixa-estragado" onclick="abrirBaixaEstragado()"><span class="nav-ic">&#x1F5D1;</span><span>Baixar estragado</span></div>
           <div class="nav-item" id="nav-estoque" onclick="go('estoque',this)"><span class="nav-ic">&#x1F4E6;</span><span>Conferir estoque</span></div>
@@ -411,30 +412,21 @@ tr:hover td{background:var(--bg2)}
           <span>&#x2699; Gestao</span><span class="arrow">&#x25B6;</span>
         </div>
         <div class="nav-items" id="grp-gestao-items">
-          <div class="nav-item" id="nav-prods" onclick="go('prods',this)"><span class="nav-ic">&#x1F3F7;</span><span>Produtos</span></div>
           <div class="nav-item" id="nav-clientes" onclick="go('clientes',this)"><span class="nav-ic">&#x1F465;</span><span>Clientes</span></div>
           <div class="nav-item" id="nav-users" onclick="go('users',this)"><span class="nav-ic">&#x1F512;</span><span>Usuarios</span></div>
           <div class="nav-item" id="nav-config" onclick="go('config',this)"><span class="nav-ic">&#x2699;</span><span>Configurações</span></div>
-        </div>
-      </div>
-      <!-- MASTER -->
-      <div class="nav-group" id="grp-master">
-        <div class="nav-group-header" onclick="toggleGrp('master')" style="color:var(--purple)">
-          <span>&#x1F3F0; Master</span><span class="arrow">&#x25B6;</span>
-        </div>
-        <div class="nav-items" id="grp-master-items">
-          <div class="nav-item" id="nav-superadmin" onclick="go('superadmin',this)" style="color:var(--purple)"><span class="nav-ic">&#x1F3F0;</span><span>Master 4to</span></div>
           <div class="nav-item" id="nav-excecoes" onclick="go('excecoes',this)" style="color:var(--red)"><span class="nav-ic">&#x26A0;</span><span>Exceções</span></div>
         </div>
       </div>
     </div>
     <div class="sf">
-      <div class="sf-user">
+      <div class="sf-user" id="sf-user">
         <div class="sf-avatar" id="sf-avatar">?</div>
         <div><div class="sf-name" id="sf-name">-</div><div class="sf-nivel" id="sf-nivel">-</div></div>
       </div>
       <div class="sf-time" id="relogio"></div>
       <button class="btn-logout" onclick="doLogout()">&#x1F6AA; Sair</button>
+      <div style="text-align:center;font-size:10px;color:var(--txt3);margin-top:10px">ConvenFácil <span style="opacity:.6">by</span> <a href="https://ninjai.com.br" target="_blank" style="color:var(--txt3);text-decoration:none;font-weight:600">NinjAI</a></div>
     </div>
   </div>
 
@@ -727,11 +719,11 @@ tr:hover td{background:var(--bg2)}
 
     <!-- SUPER ADMIN -->
     <div class="sec" id="sec-superadmin">
-      <div class="topbar"><h1>Painel Master &mdash; 4to</h1><button class="btn acc" onclick="openModal('sa-cliente')">+ Novo cliente</button></div>
+      <div class="topbar"><h1>Painel Master</h1><button class="btn acc" onclick="openModal('sa-cliente')">+ Novo cliente</button></div>
       <div class="sec-body">
         <div class="sa-header">
           <div class="sa-header-icon">&#x1F3F0;</div>
-          <div><div class="sa-header-title">Painel Super Admin</div><div class="sa-header-sub">Gerencie todos os clientes e funcionalidades</div></div>
+          <div><div class="sa-header-title">Painel Master</div><div class="sa-header-sub">Gerencie todas as lojas, planos e funcionalidades</div></div>
         </div>
         <div class="sa-cards">
           <div class="sa-card"><div class="val" style="color:var(--acc)" id="sa-tc">0</div><div class="lbl">Clientes ativos</div></div>
@@ -1339,7 +1331,7 @@ const FUNCIONALIDADES=[
 // Permissoes por nivel
 const PERMISSOES={
   superadmin:{editar:true,excluir:true,relatorios:true,excecoes:true},
-  admin:{editar:true,excluir:true,relatorios:true,excecoes:false},
+  admin:{editar:true,excluir:true,relatorios:true,excecoes:true},
   gerente:{editar:false,excluir:false,relatorios:true,excecoes:false},
   operador:{editar:false,excluir:false,relatorios:false,excecoes:false}
 }
@@ -1369,7 +1361,19 @@ function iniciarApp(){
   document.getElementById('app').classList.add('on')
   document.getElementById('sf-avatar').textContent=userLogado.nome.charAt(0).toUpperCase()
   document.getElementById('sf-name').textContent=userLogado.nome
-  document.getElementById('sf-nivel').textContent=userLogado.nivel
+  document.getElementById('sf-nivel').textContent=userLogado.nivel==='superadmin'?'Master':userLogado.nivel
+  // O painel que controla todas as lojas (antigo "Super Admin"/"Master 4to") nao tem mais
+  // botao proprio no menu — so quem loga como superadmin ve e acessa clicando no proprio perfil.
+  var sfUser=document.getElementById('sf-user')
+  if(userLogado.nivel==='superadmin'){
+    sfUser.style.cursor='pointer'
+    sfUser.title='Painel Master'
+    sfUser.onclick=function(){go('superadmin')}
+  }else{
+    sfUser.style.cursor='default'
+    sfUser.title=''
+    sfUser.onclick=null
+  }
   ajustarMenuPorNivel()
   ajustarMenuPorFuncionalidades()
   loadProds();loadPromos()
@@ -1402,22 +1406,17 @@ function ajustarMenuPorNivel(){
   var nivel=userLogado.nivel
   // Operador: so PDV
   if(nivel==='operador'){
-    ['grp-estoque','grp-fin','grp-gestao','grp-master'].forEach(function(id){
+    ['grp-estoque','grp-fin','grp-gestao'].forEach(function(id){
       var el=document.getElementById(id);if(el)el.style.display='none'
     })
     var navPromos=document.getElementById('nav-promos');if(navPromos)navPromos.style.display='none'
   }
-  // Gerente: sem gestao e master
+  // Gerente: sem gestao
   else if(nivel==='gerente'){
-    ['grp-gestao','grp-master'].forEach(function(id){
-      var el=document.getElementById(id);if(el)el.style.display='none'
-    })
+    var elg=document.getElementById('grp-gestao');if(elg)elg.style.display='none'
   }
-  // Admin: sem master
-  else if(nivel==='admin'){
-    var el=document.getElementById('grp-master');if(el)el.style.display='none'
-  }
-  // Superadmin: tudo visivel
+  // Admin e Superadmin: gestao completa visivel (o painel Master, que so o superadmin tem,
+  // nao fica mais no menu — acessa clicando no proprio perfil, ver iniciarApp())
 }
 
 function doLogout(){
@@ -2459,7 +2458,7 @@ async function renderUsers(){
   var res=await db.from('usuarios').select('*').order('nome')
   var tb=document.getElementById('users-tb')
   if(!res.data){tb.innerHTML='<tr><td colspan="5"><div class="empty">Erro</div></td></tr>';return}
-  var nl={superadmin:'Super Admin',admin:'Administrador',gerente:'Gerente',operador:'Operador'}
+  var nl={superadmin:'Master',admin:'Administrador',gerente:'Gerente',operador:'Operador'}
   tb.innerHTML=res.data.map(function(u){
     return'<tr>'+
       '<td><strong>'+u.nome+'</strong></td>'+
