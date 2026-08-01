@@ -437,7 +437,7 @@ tr:hover td{background:var(--bg2)}
       <div class="topbar">
         <h1>PDV &mdash; Caixa</h1>
         <div class="topbar-right">
-          <span style="font-size:11px;color:var(--txt3)" title="F2 busca produto | F3 leitor USB | F4 finalizar venda | F6 imprimir cupom | Ctrl+Delete limpar pedido">&#x2328; F2 busca &bull; F3 leitor &bull; F4 finalizar &bull; F6 cupom &bull; Ctrl+Del limpar</span>
+          <span style="font-size:11px;color:var(--txt3)" title="F2 busca produto | F3 leitor USB | F4 finalizar venda | F6 imprimir cupom | Ctrl+Delete limpar pedido | F12 chama o PDV de qualquer tela">&#x2328; F2 busca &bull; F3 leitor &bull; F4 finalizar &bull; F6 cupom &bull; Ctrl+Del limpar &bull; F12 volta ao PDV</span>
           <span style="font-size:12px;color:var(--txt3)" id="pdv-info">Carregando...</span>
           <button class="btn sm" onclick="toggleBarcode()" id="btn-barcode" title="Leitor USB de codigo de barras">&#x1F4F0; USB</button>
           <button class="btn sm" onclick="toggleCamera()" id="btn-camera" title="Leitor por camera">&#x1F4F7; Camera</button>
@@ -650,6 +650,7 @@ tr:hover td{background:var(--bg2)}
     <div class="sec" id="sec-prods">
       <div class="topbar"><h1>Produtos</h1><button class="btn acc" onclick="openModal('prod')">+ Novo</button></div>
       <div class="sec-body">
+        <div class="search-box" style="margin-bottom:12px"><input class="search-input" type="text" id="srch-prods" placeholder="Buscar por nome ou categoria..." oninput="filterProdsTabela()"></div>
         <div class="tbl"><table><thead><tr><th>Produto</th><th>Categoria</th><th>Custo</th><th>Venda</th><th>Margem</th><th>Estoque</th><th></th></tr></thead><tbody id="pt"></tbody></table></div>
       </div>
     </div>
@@ -716,6 +717,7 @@ tr:hover td{background:var(--bg2)}
           <div class="lrow"><span>F4</span><span style="color:var(--txt2)">Abrir Finalizar Venda</span></div>
           <div class="lrow"><span>F6</span><span style="color:var(--txt2)">Imprimir cupom</span></div>
           <div class="lrow"><span>Ctrl + Delete</span><span style="color:var(--txt2)">Limpar pedido (combinacao de proposito, pra nao disparar sem querer)</span></div>
+          <div class="lrow"><span>F12</span><span style="color:var(--txt2)">Chamar o PDV de qualquer tela do sistema</span></div>
         </div>
       </div>
     </div>
@@ -2344,9 +2346,15 @@ function printRel(){
 
 // PRODUTOS
 function renderProds(){
+  var s=document.getElementById('srch-prods')
+  if(s)s.value=''
+  drawProds(prods)
+}
+
+function drawProds(lista){
   var tb=document.getElementById('pt')
-  if(!prods.length){tb.innerHTML='<tr><td colspan="7"><div class="empty">Nenhum produto</div></td></tr>';return}
-  tb.innerHTML=prods.map(function(p){
+  if(!lista.length){tb.innerHTML='<tr><td colspan="7"><div class="empty">Nenhum produto encontrado</div></td></tr>';return}
+  tb.innerHTML=lista.map(function(p){
     var mg=p.preco_custo>0?(((p.preco_venda-p.preco_custo)/p.preco_custo)*100).toFixed(0):0
     var cor=p.estoque===0?'var(--red)':p.estoque<=p.estoque_minimo?'var(--yellow)':'var(--txt1)'
     return'<tr>'+
@@ -2362,6 +2370,17 @@ function renderProds(){
       '</td>'+
     '</tr>'
   }).join('')
+}
+
+function filterProdsTabela(){
+  var q=document.getElementById('srch-prods').value.trim().toLowerCase()
+  if(!q){drawProds(prods);return}
+  var filtrado=prods.filter(function(p){
+    return (p.nome||'').toLowerCase().indexOf(q)>-1||
+      (p.categoria||'').toLowerCase().indexOf(q)>-1||
+      (p.codigo_barras||'').toLowerCase().indexOf(q)>-1
+  })
+  drawProds(filtrado)
 }
 
 function editProd(id){
@@ -2616,6 +2635,34 @@ document.addEventListener('click', function(e){
 // Fechar modal com ESC
 document.addEventListener('keydown', function(e){
   if(e.key === 'Escape') closeModals()
+})
+
+// Bloqueia F5/Ctrl+R (atualizar a pagina) sem querer — o app nao salva o carrinho em lugar
+// nenhum, entao atualizar a pagina no meio de uma venda derruba o login e perde o pedido.
+document.addEventListener('keydown', function(e){
+  if(e.key==='F5'||((e.ctrlKey||e.metaKey)&&(e.key==='r'||e.key==='R'))){
+    e.preventDefault()
+    toast('Atualizar a pagina fecha o sistema e perde o pedido atual',1)
+  }
+})
+
+// Se mesmo assim tentar fechar/recarregar por outro caminho (botao do navegador, fechar aba)
+// com um pedido em andamento no carrinho, o proprio navegador pergunta antes de sair.
+window.addEventListener('beforeunload', function(e){
+  if(cart&&cart.length){
+    e.preventDefault()
+    e.returnValue=''
+  }
+})
+
+// F12 chama o PDV de qualquer tela do sistema (nao so de dentro do PDV, ao contrario
+// dos atalhos F2/F3/F4/F6). Obs: no Chrome o F12 tambem abre o DevTools — isso e do
+// navegador, o app nao tem como bloquear isso, mas o atalho pro PDV funciona igual.
+document.addEventListener('keydown', function(e){
+  if(e.key==='F12'){
+    if(!userLogado||document.querySelector('.ov.open'))return
+    go('pdv',document.getElementById('nav-pdv'))
+  }
 })
 
 // Atalhos de teclado do PDV — so funcionam com a tela de Caixa aberta e nenhum modal em cima.
