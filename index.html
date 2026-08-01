@@ -576,6 +576,7 @@ tr:hover td{background:var(--bg2)}
     <div class="sec" id="sec-clientes">
       <div class="topbar"><h1>Clientes / Fiado</h1><button class="btn acc" onclick="openModal('cliente-fiado')">+ Novo cliente</button></div>
       <div class="sec-body">
+        <div class="search-box" style="margin-bottom:12px"><input class="search-input" type="text" id="srch-clientes" placeholder="Buscar por nome, telefone ou CPF..." oninput="filterClientesFiado()"></div>
         <div class="tbl"><table><thead><tr><th>Nome</th><th>Telefone</th><th>CPF</th><th>Fiado em aberto</th><th></th></tr></thead><tbody id="clientes-tb"></tbody></table></div>
       </div>
     </div>
@@ -1014,6 +1015,10 @@ tr:hover td{background:var(--bg2)}
     <div style="display:flex;gap:8px;margin-top:4px;margin-bottom:16px">
       <button class="btn sm acc" onclick="closeModals();openModal('cliente-fiado')" style="flex:1">+ Novo cliente</button>
     </div>
+    <div class="fg">
+      <label>Promessa de pagamento (vencimento)</label>
+      <input type="date" id="fiado-data-promessa" style="width:100%">
+    </div>
     <div class="modal-ft">
       <button class="btn" onclick="closeModals()">Cancelar</button>
       <button class="btn grn" onclick="confirmarFiado()">&#x2713; Confirmar fiado</button>
@@ -1297,6 +1302,8 @@ function confirmarPay(metodo){
   // Fiado: abrir cadastro de cliente
   if(metodo==='Fiado'){
     carregarClientesFiado()
+    var venc=new Date();venc.setDate(venc.getDate()+7)
+    document.getElementById('fiado-data-promessa').value=venc.toISOString().slice(0,10)
     document.getElementById('ov-fiado-cliente').classList.add('open')
     return
   }
@@ -1387,10 +1394,12 @@ function confirmarFiado(){
   var sel=document.getElementById('fiado-cliente-sel')
   var clienteId=sel.value
   var clienteNome=sel.options[sel.selectedIndex]?sel.options[sel.selectedIndex].text:''
+  var dataPromessa=document.getElementById('fiado-data-promessa').value
   if(!clienteId){toast('Selecione um cliente',1);return}
+  if(!dataPromessa){toast('Informe a data prometida de pagamento',1);return}
   closeModals()
   payMetodo='Fiado'
-  payClienteFiado={id:clienteId,nome:clienteNome}
+  payClienteFiado={id:clienteId,nome:clienteNome,dataPromessa:dataPromessa}
   abrirConfirmar('Fiado - '+clienteNome.split(' - ')[0])
 }
 
@@ -1418,6 +1427,18 @@ async function pay(metodo,cpf,imprimirRecibo){
     var c=cart[i]
     var p=prods.find(function(x){return x.id===c.id})
     if(p){var ne=p.estoque-c.qty;await db.from('produtos').update({estoque:ne}).eq('id',c.id);p.estoque=ne}
+  }
+  // Fiado: lancar automaticamente em Contas a Receber, vinculado ao cliente e com a data prometida
+  if(metodo==='Fiado'&&payClienteFiado){
+    await db.from('contas_receber').insert({
+      descricao:'Fiado - '+payClienteFiado.nome,
+      cliente_nome:payClienteFiado.nome,
+      cliente_fiado_id:payClienteFiado.id,
+      venda_id:venda.id,
+      valor:total,
+      vencimento:payClienteFiado.dataPromessa
+    })
+    payClienteFiado=null
   }
   var msg='Pagamento '+metodo+' - R$ '+total.toFixed(2)+'!'
   if(cpf)msg+=' | CPF: '+cpf
@@ -1838,23 +1859,48 @@ async function delProd(id){
 }
 
 // CLIENTES FIADO
+var clientesFiadoCache=[]
+
 async function renderClientesFiado(){
   var res=await db.from('clientes_fiado').select('*').order('nome')
   var lista=res.data||[]
+  var cr=await db.from('contas_receber').select('cliente_fiado_id,valor').eq('recebido',false)
+  var saldos={}
+  ;(cr.data||[]).forEach(function(c){
+    if(!c.cliente_fiado_id)return
+    saldos[c.cliente_fiado_id]=(saldos[c.cliente_fiado_id]||0)+Number(c.valor)
+  })
+  clientesFiadoCache=lista.map(function(c){return Object.assign({},c,{saldoFiado:saldos[c.id]||0})})
+  document.getElementById('srch-clientes').value=''
+  drawClientesFiado(clientesFiadoCache)
+}
+
+function drawClientesFiado(lista){
   var tb=document.getElementById('clientes-tb')
-  if(!lista.length){tb.innerHTML='<tr><td colspan="5"><div class="empty">Nenhum cliente cadastrado</div></td></tr>';return}
+  if(!lista.length){tb.innerHTML='<tr><td colspan="5"><div class="empty">Nenhum cliente encontrado</div></td></tr>';return}
   tb.innerHTML=lista.map(function(c){
-    var fiado='R$ 0,00'
+    var fiado='R$ '+c.saldoFiado.toFixed(2).replace('.',',')
     return'<tr>'+
       '<td><strong>'+c.nome+'</strong></td>'+
       '<td style="color:var(--txt2)">'+( c.telefone||'-')+'</td>'+
       '<td style="color:var(--txt2)">'+( c.cpf||'Nao informado')+'</td>'+
-      '<td style="color:var(--red);font-weight:600">'+fiado+'</td>'+
+      '<td style="color:'+(c.saldoFiado>0?'var(--red)':'var(--txt2)')+';font-weight:600">'+fiado+'</td>'+
       '<td style="display:flex;gap:5px">'+
         '<button class="btn sm red" onclick="delClienteFiado(\''+ c.id+'\')" >Excluir</button>'+
       '</td>'+
     '</tr>'
   }).join('')
+}
+
+function filterClientesFiado(){
+  var q=document.getElementById('srch-clientes').value.trim().toLowerCase()
+  if(!q){drawClientesFiado(clientesFiadoCache);return}
+  var filtrado=clientesFiadoCache.filter(function(c){
+    return (c.nome||'').toLowerCase().indexOf(q)>-1||
+      (c.telefone||'').toLowerCase().indexOf(q)>-1||
+      (c.cpf||'').toLowerCase().indexOf(q)>-1
+  })
+  drawClientesFiado(filtrado)
 }
 
 async function delClienteFiado(id){
