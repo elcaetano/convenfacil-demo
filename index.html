@@ -437,7 +437,7 @@ tr:hover td{background:var(--bg2)}
       <div class="topbar">
         <h1>PDV &mdash; Caixa</h1>
         <div class="topbar-right">
-          <span style="font-size:11px;color:var(--txt3)" title="F2 busca produto | F3 leitor USB | F4 finalizar venda | F6 imprimir cupom">&#x2328; F2 busca &bull; F3 leitor &bull; F4 finalizar &bull; F6 cupom</span>
+          <span style="font-size:11px;color:var(--txt3)" title="F2 busca produto | F3 leitor USB | F4 finalizar venda | F6 imprimir cupom | Ctrl+Delete limpar pedido">&#x2328; F2 busca &bull; F3 leitor &bull; F4 finalizar &bull; F6 cupom &bull; Ctrl+Del limpar</span>
           <span style="font-size:12px;color:var(--txt3)" id="pdv-info">Carregando...</span>
           <button class="btn sm" onclick="toggleBarcode()" id="btn-barcode" title="Leitor USB de codigo de barras">&#x1F4F0; USB</button>
           <button class="btn sm" onclick="toggleCamera()" id="btn-camera" title="Leitor por camera">&#x1F4F7; Camera</button>
@@ -706,6 +706,16 @@ tr:hover td{background:var(--bg2)}
           <div class="lrow"><span>CNPJ</span><span id="cfg-status-cnpj" class="tag out">Nao configurado</span></div>
           <div class="lrow"><span>Chave PIX</span><span id="cfg-status-pix" class="tag out">Nao configurado</span></div>
           <div class="lrow"><span>Impressora termica</span><span class="tag low">Usar impressora padrao</span></div>
+        </div>
+        <!-- ATALHOS DO PDV -->
+        <div class="lcard" style="margin-top:16px">
+          <h3 style="margin-bottom:14px">&#x2328; Atalhos de teclado do PDV</h3>
+          <p style="font-size:12px;color:var(--txt3);margin-bottom:12px">Funcionam com a tela de Caixa aberta, sem nenhum modal na frente. Bom pra treinar quem vai operar o caixa.</p>
+          <div class="lrow"><span>F2</span><span style="color:var(--txt2)">Focar busca de produto</span></div>
+          <div class="lrow"><span>F3</span><span style="color:var(--txt2)">Ligar/desligar leitor USB</span></div>
+          <div class="lrow"><span>F4</span><span style="color:var(--txt2)">Abrir Finalizar Venda</span></div>
+          <div class="lrow"><span>F6</span><span style="color:var(--txt2)">Imprimir cupom</span></div>
+          <div class="lrow"><span>Ctrl + Delete</span><span style="color:var(--txt2)">Limpar pedido (combinacao de proposito, pra nao disparar sem querer)</span></div>
         </div>
       </div>
     </div>
@@ -2625,6 +2635,9 @@ document.addEventListener('keydown', function(e){
     e.preventDefault();abrirResumoPedido()
   } else if(e.key==='F6'){
     e.preventDefault();imprimirCupom()
+  } else if(e.ctrlKey&&e.key==='Delete'){
+    // Ctrl+Delete de proposito (nao uma tecla solta) pra "Limpar pedido" nao disparar sem querer
+    e.preventDefault();clearCart()
   }
 })
 
