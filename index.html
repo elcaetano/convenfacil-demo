@@ -373,6 +373,8 @@ tr:hover td{background:var(--bg2)}
         </div>
         <div class="nav-items" id="grp-vendas-items">
           <div class="nav-item on" id="nav-pdv" onclick="go('pdv',this)"><span class="nav-ic">&#x1F6D2;</span><span>PDV / Caixa</span></div>
+          <div class="nav-item" id="nav-mesas" onclick="go('mesas',this)" style="display:none"><span class="nav-ic">&#x1F37D;</span><span>Mesas</span></div>
+          <div class="nav-item" id="nav-kds" onclick="go('kds',this)" style="display:none"><span class="nav-ic">&#x1F373;</span><span>Cozinha (KDS)</span></div>
           <div class="nav-item" id="nav-promos" onclick="go('promos',this)"><span class="nav-ic">&#x1F525;</span><span>Promoções</span></div>
         </div>
       </div>
@@ -488,6 +490,45 @@ tr:hover td{background:var(--bg2)}
     <div class="sec" id="sec-promos">
       <div class="topbar"><h1>Promoções do dia</h1><div class="topbar-right"><button class="btn acc" onclick="openModal('promo')">+ Nova promoção</button></div></div>
       <div class="sec-body"><div class="promo-grid" id="promo-grid"><div class="loading"><div class="spin"></div>Carregando...</div></div></div>
+    </div>
+
+    <!-- MESAS -->
+    <div class="sec" id="sec-mesas">
+      <div class="topbar"><h1>&#x1F37D; Atendimento por Mesas</h1><div class="topbar-right"><button class="btn acc" onclick="abrirNovaMesa()">+ Nova mesa</button></div></div>
+      <div class="sec-body">
+        <div id="mesas-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px"></div>
+      </div>
+    </div>
+
+    <!-- KDS -->
+    <div class="sec" id="sec-kds">
+      <div class="topbar"><h1>&#x1F373; Cozinha (KDS)</h1><div class="topbar-right"><span style="font-size:12px;color:var(--txt3)">Atualiza sozinho</span></div></div>
+      <div class="sec-body">
+        <div id="kds-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px"></div>
+      </div>
+    </div>
+
+    <!-- COMANDA DA MESA -->
+    <div class="sec" id="sec-comanda">
+      <div class="topbar">
+        <h1 id="comanda-titulo">Mesa</h1>
+        <div class="topbar-right">
+          <span style="font-size:12px;color:var(--txt3)" id="comanda-tempo"></span>
+          <button class="btn" onclick="go('mesas')">&#x2190; Voltar ao mapa</button>
+        </div>
+      </div>
+      <div class="sec-body">
+        <div style="background:var(--bg1);border:1px solid var(--border);border-radius:var(--rad2);padding:14px;margin-bottom:14px">
+          <div id="comanda-itens"></div>
+          <div style="display:flex;justify-content:space-between;font-size:20px;font-weight:800;padding-top:12px;margin-top:8px;border-top:1px solid var(--border)">
+            <span>TOTAL</span><span id="comanda-total" style="color:var(--green)">R$ 0,00</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn acc" onclick="abrirAddItemComanda()">&#x2795; Adicionar item</button>
+          <button class="btn grn" onclick="abrirFecharComanda()">&#x2705; Fechar conta</button>
+        </div>
+      </div>
     </div>
 
     <!-- ESTOQUE -->
@@ -1108,6 +1149,69 @@ tr:hover td{background:var(--bg2)}
   </div>
 </div>
 
+<!-- MODAL NOVA MESA -->
+<div class="ov" id="ov-nova-mesa">
+  <div class="modal" style="max-width:380px">
+    <h2>&#x1F37D; Nova mesa</h2>
+    <div class="fgrid c2">
+      <div class="fg"><label>Numero</label><input type="number" id="nm-numero" placeholder="1" min="1"></div>
+      <div class="fg"><label>Capacidade</label><input type="number" id="nm-capacidade" placeholder="4" min="1" value="4"></div>
+    </div>
+    <div class="fgrid c1"><div class="fg"><label>Nome (opcional)</label><input type="text" id="nm-nome" placeholder="Ex: Varanda 1"></div></div>
+    <div class="modal-ft"><button class="btn" onclick="closeModals()">Cancelar</button><button class="btn acc" onclick="confirmarNovaMesa()">Criar mesa</button></div>
+  </div>
+</div>
+
+<!-- MODAL ABRIR MESA -->
+<div class="ov" id="ov-abrir-mesa">
+  <div class="modal" style="max-width:400px">
+    <h2 id="am-titulo">&#x1F37D; Abrir mesa</h2>
+    <div class="fgrid c2">
+      <div class="fg"><label>Cliente (opcional)</label><input type="text" id="am-cliente" placeholder="Nome do cliente"></div>
+      <div class="fg"><label>Pessoas</label><input type="number" id="am-pessoas" min="1" value="1"></div>
+    </div>
+    <div class="fgrid c1"><div class="fg"><label>Observações</label><input type="text" id="am-obs" placeholder="Ex: mesa perto da janela"></div></div>
+    <div class="modal-ft"><button class="btn" onclick="closeModals()">Cancelar</button><button class="btn acc" onclick="confirmarAbrirMesa()">Abrir mesa</button></div>
+  </div>
+</div>
+
+<!-- MODAL ADICIONAR ITEM NA COMANDA -->
+<div class="ov" id="ov-add-item-comanda">
+  <div class="modal" style="max-width:520px;max-height:88vh;overflow-y:auto">
+    <h2>&#x2795; Adicionar item</h2>
+    <input class="search-input" type="text" id="aic-busca" placeholder="Buscar produto..." oninput="filtrarAddItemComanda()" style="margin-bottom:10px">
+    <div id="aic-lista"></div>
+    <div class="modal-ft"><button class="btn" onclick="closeModals()">Fechar</button></div>
+  </div>
+</div>
+
+<!-- MODAL CANCELAR ITEM DA COMANDA -->
+<div class="ov" id="ov-cancelar-item">
+  <div class="modal" style="max-width:380px">
+    <h2>&#x1F5D1; Cancelar item</h2>
+    <div class="fgrid c1"><div class="fg"><label>Motivo</label><input type="text" id="ci-motivo" placeholder="Ex: cliente desistiu, item errado..."></div></div>
+    <div class="fgrid c1"><div class="fg"><label>Senha do gerente/admin</label><input type="password" id="ci-senha" placeholder="••••••"></div></div>
+    <div class="modal-ft"><button class="btn" onclick="closeModals()">Cancelar</button><button class="btn red" onclick="confirmarCancelarItem()">Confirmar cancelamento</button></div>
+  </div>
+</div>
+
+<!-- MODAL FECHAR COMANDA -->
+<div class="ov" id="ov-fechar-comanda">
+  <div class="modal" style="max-width:400px;text-align:center">
+    <div style="font-size:36px;margin-bottom:8px">&#x2705;</div>
+    <h2>Fechar conta</h2>
+    <div style="font-size:26px;font-weight:800;color:var(--green);margin:10px 0" id="fc-total">R$ 0,00</div>
+    <div style="font-size:12px;color:var(--txt3);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin:10px 0">Forma de pagamento</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+      <button class="pay-btn" onclick="fecharComandaComPagamento('Dinheiro')"><span class="pay-ic">&#x1F4B5;</span>Dinheiro</button>
+      <button class="pay-btn" onclick="fecharComandaComPagamento('Cartao')"><span class="pay-ic">&#x1F4B3;</span>Cartao</button>
+      <button class="pay-btn" onclick="fecharComandaComPagamento('PIX')"><span class="pay-ic">&#x1F4F1;</span>PIX</button>
+      <button class="pay-btn" onclick="fecharComandaComPagamento('Fiado')"><span class="pay-ic">&#x1F4D3;</span>Fiado</button>
+    </div>
+    <button class="btn" style="width:100%;justify-content:center" onclick="closeModals()">&#x2190; Voltar</button>
+  </div>
+</div>
+
 <!-- MODAL CONFIRMACAO GENERICA (exclusoes etc) -->
 <div class="ov" id="ov-confirm-generico">
   <div class="modal" style="text-align:center;max-width:380px">
@@ -1181,7 +1285,8 @@ const FUNCIONALIDADES=[
   {key:'multiplos_caixas',label:'Multi-caixas',ic:'&#x1F5A5;'},
   {key:'impressao_cupom',label:'Impressao',ic:'&#x1F5A8;'},
   {key:'maquininha',label:'Maquininha',ic:'&#x1F4F1;'},
-  {key:'whatsapp_alertas',label:'WhatsApp',ic:'&#x1F4AC;'}
+  {key:'whatsapp_alertas',label:'WhatsApp',ic:'&#x1F4AC;'},
+  {key:'atendimento_mesas',label:'Atendimento Mesas',ic:'&#x1F37D;'}
 ]
 
 // Permissoes por nivel
@@ -1219,9 +1324,24 @@ function iniciarApp(){
   document.getElementById('sf-name').textContent=userLogado.nome
   document.getElementById('sf-nivel').textContent=userLogado.nivel
   ajustarMenuPorNivel()
+  ajustarMenuPorFuncionalidades()
   loadProds();loadPromos()
   carregarCategorias().then(preencherSelectCategorias)
   tick();setInterval(tick,30000)
+}
+
+var funcsAtivas={}
+async function ajustarMenuPorFuncionalidades(){
+  var navMesas=document.getElementById('nav-mesas')
+  var navKds=document.getElementById('nav-kds')
+  if(!userLogado.cliente_id){if(navMesas)navMesas.style.display='none';if(navKds)navKds.style.display='none';return}
+  try{
+    var res=await db.from('funcionalidades').select('*').eq('cliente_id',userLogado.cliente_id).single()
+    funcsAtivas=res.data||{}
+  }catch(e){funcsAtivas={}}
+  var mostrar=funcsAtivas.atendimento_mesas?'':'none'
+  if(navMesas)navMesas.style.display=mostrar
+  if(navKds)navKds.style.display=mostrar
 }
 
 function ajustarMenuPorNivel(){
@@ -1293,6 +1413,8 @@ function go(id,el){
   if(id==='clientes')renderClientesFiado()
   if(id==='relatorio')renderRelatorio()
   if(id==='excecoes')carregarExcecoes().then(renderExceções)
+  if(id==='mesas')renderMesas()
+  if(id==='kds')renderKds()
 }
 
 // BARCODE
@@ -2495,7 +2617,7 @@ async function addSaCliente(){
   if(!nome||!email){toast('Preencha nome e email',1);return}
   var res=await db.from('clientes').insert({nome:nome,email:email,telefone:tel,plano:plano}).select().single()
   if(res.error){toast('Erro',1);return}
-  await db.from('funcionalidades').insert({cliente_id:res.data.id,pdv:true,estoque:true,promocoes:false,financeiro:false,relatorios:false,multiplos_caixas:false,impressao_cupom:false,maquininha:false,whatsapp_alertas:false})
+  await db.from('funcionalidades').insert({cliente_id:res.data.id,pdv:true,estoque:true,promocoes:false,financeiro:false,relatorios:false,multiplos_caixas:false,impressao_cupom:false,maquininha:false,whatsapp_alertas:false,atendimento_mesas:false})
   closeModals();renderSuperAdmin();toast('Cliente cadastrado!')
 }
 
@@ -3132,6 +3254,352 @@ function imprimirCupom(){
   w.document.write(html)
   w.document.close()
   setTimeout(function(){ w.print() }, 600)
+}
+
+// ============ ATENDIMENTO POR MESAS (modulo, liga/desliga por cliente) ============
+var mesasCache=[], mesaAtualId=null, comandaAtualId=null, itensComandaCache=[], comandaTimerInterval=null
+
+async function renderMesas(){
+  var res=await db.from('mesas').select('*').order('numero')
+  mesasCache=res.data||[]
+  var grid=document.getElementById('mesas-grid')
+  if(!mesasCache.length){grid.innerHTML='<div class="empty">Nenhuma mesa cadastrada ainda. Clique em "+ Nova mesa".</div>';return}
+  var cores={livre:'var(--green)',ocupada:'var(--acc)',conta_solicitada:'var(--yellow)'}
+  grid.innerHTML=mesasCache.map(function(m){
+    var cor=cores[m.status]||'var(--txt3)'
+    var tempo=m.aberta_em?tempoDecorrido(m.aberta_em):''
+    return '<div onclick="clicarMesa(\''+m.id+'\')" style="cursor:pointer;background:var(--bg1);border:2px solid '+cor+';border-radius:var(--rad2);padding:16px;text-align:center;transition:.15s">'+
+      '<div style="font-size:26px;font-weight:800">'+m.numero+'</div>'+
+      '<div style="font-size:11px;color:var(--txt3);margin:4px 0;min-height:14px">'+(m.nome||'')+'</div>'+
+      '<div style="display:inline-block;padding:3px 10px;border-radius:20px;background:'+cor+';color:#000;font-size:11px;font-weight:700;text-transform:uppercase">'+labelStatusMesa(m.status)+'</div>'+
+      (m.status!=='livre'?'<div style="font-size:11px;color:var(--txt3);margin-top:6px">'+(m.garcom_nome||'')+(tempo?' • '+tempo:'')+'</div>':'')+
+    '</div>'
+  }).join('')
+  iniciarRealtimeMesas()
+}
+
+function labelStatusMesa(s){
+  var map={livre:'Livre',ocupada:'Ocupada',conta_solicitada:'Conta pedida'}
+  return map[s]||s
+}
+
+function tempoDecorrido(dataIso){
+  var ms=Date.now()-new Date(dataIso).getTime()
+  var min=Math.floor(ms/60000)
+  if(min<60)return min+'min'
+  var h=Math.floor(min/60)
+  return h+'h'+(min%60)+'min'
+}
+
+function abrirNovaMesa(){
+  var proxNum=mesasCache.length?Math.max.apply(null,mesasCache.map(function(m){return m.numero}))+1:1
+  document.getElementById('nm-numero').value=proxNum
+  document.getElementById('nm-capacidade').value=4
+  document.getElementById('nm-nome').value=''
+  document.getElementById('ov-nova-mesa').classList.add('open')
+}
+
+async function confirmarNovaMesa(){
+  var numero=parseInt(document.getElementById('nm-numero').value)||0
+  if(!numero){toast('Informe o numero da mesa',1);return}
+  var capacidade=parseInt(document.getElementById('nm-capacidade').value)||4
+  var nome=document.getElementById('nm-nome').value.trim()
+  await db.from('mesas').insert({numero:numero,capacidade:capacidade,nome:nome||null,status:'livre'})
+  closeModals()
+  toast('Mesa criada!')
+  renderMesas()
+}
+
+function clicarMesa(id){
+  var m=mesasCache.find(function(x){return x.id===id})
+  if(!m)return
+  if(m.status==='livre'){
+    mesaAtualId=id
+    document.getElementById('am-titulo').innerHTML='&#x1F37D; Abrir mesa '+m.numero
+    document.getElementById('am-cliente').value=''
+    document.getElementById('am-pessoas').value=1
+    document.getElementById('am-obs').value=''
+    document.getElementById('ov-abrir-mesa').classList.add('open')
+  }else{
+    abrirComanda(id)
+  }
+}
+
+async function confirmarAbrirMesa(){
+  var m=mesasCache.find(function(x){return x.id===mesaAtualId})
+  if(!m)return
+  var cliente=document.getElementById('am-cliente').value.trim()
+  var pessoas=parseInt(document.getElementById('am-pessoas').value)||1
+  var obs=document.getElementById('am-obs').value.trim()
+  var res=await db.from('comandas').insert({mesa_id:m.id,mesa_numero:m.numero,cliente_nome:cliente||null,pessoas:pessoas,garcom_abertura:userLogado.nome,observacoes:obs||null,status:'aberta'}).select().single()
+  var comanda=res.data
+  await db.from('mesas').update({status:'ocupada',garcom_nome:userLogado.nome,comanda_atual_id:comanda.id,aberta_em:new Date().toISOString()}).eq('id',m.id)
+  closeModals()
+  renderMesas()
+  abrirComanda(m.id)
+}
+
+async function abrirComanda(mesaId){
+  mesaAtualId=mesaId
+  var res=await db.from('mesas').select('*').eq('id',mesaId).single()
+  var m=res.data
+  if(!m||!m.comanda_atual_id){toast('Mesa sem comanda aberta',1);return}
+  comandaAtualId=m.comanda_atual_id
+  document.getElementById('comanda-titulo').textContent='Mesa '+m.numero+(m.nome?' — '+m.nome:'')
+  go('comanda')
+  await renderComanda()
+  if(comandaTimerInterval)clearInterval(comandaTimerInterval)
+  atualizarComandaTempo(m.aberta_em)
+  comandaTimerInterval=setInterval(function(){atualizarComandaTempo(m.aberta_em)},15000)
+}
+
+function atualizarComandaTempo(abertaEm){
+  if(!abertaEm)return
+  var el=document.getElementById('comanda-tempo')
+  if(el)el.textContent='Aberta há '+tempoDecorrido(abertaEm)
+}
+
+async function renderComanda(){
+  var res=await db.from('itens_comanda').select('*').eq('comanda_id',comandaAtualId).order('lancado_em')
+  itensComandaCache=res.data||[]
+  var el=document.getElementById('comanda-itens')
+  if(!itensComandaCache.length){el.innerHTML='<div class="empty">Nenhum item lançado ainda</div>';document.getElementById('comanda-total').textContent='R$ 0,00';return}
+  var statusLabel={em_preparo:'Em preparo',pronto:'Pronto',entregue:'Entregue',cancelado:'Cancelado'}
+  var statusCor={em_preparo:'var(--yellow)',pronto:'var(--green)',entregue:'var(--txt3)',cancelado:'var(--red)'}
+  el.innerHTML=itensComandaCache.map(function(it){
+    var subtotal=Number(it.preco_unit)*it.qtd
+    return '<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)'+(it.status==='cancelado'?';opacity:.5':'')+'">'+
+      '<div style="flex:1">'+
+        '<div style="font-size:13px;font-weight:600">'+it.qtd+'x '+it.produto_nome+'</div>'+
+        (it.observacoes?'<div style="font-size:11px;color:var(--txt3)">'+it.observacoes+'</div>':'')+
+      '</div>'+
+      '<span style="font-size:11px;font-weight:700;color:'+(statusCor[it.status]||'var(--txt3)')+';text-transform:uppercase">'+(statusLabel[it.status]||it.status)+'</span>'+
+      '<div style="font-size:13px;font-weight:700;color:var(--acc);min-width:70px;text-align:right">R$ '+subtotal.toFixed(2)+'</div>'+
+      (it.status!=='cancelado'&&it.status!=='entregue'?'<button class="btn sm red" onclick="abrirCancelarItem(\''+it.id+'\')">Cancelar</button>':'')+
+    '</div>'
+  }).join('')
+  var total=itensComandaCache.filter(function(it){return it.status!=='cancelado'}).reduce(function(a,it){return a+Number(it.preco_unit)*it.qtd},0)
+  document.getElementById('comanda-total').textContent='R$ '+total.toFixed(2)
+}
+
+// Adicionar item na comanda
+var addItemComandaTemp={}
+function abrirAddItemComanda(){
+  addItemComandaTemp={}
+  document.getElementById('aic-busca').value=''
+  renderAddItemComandaLista(prods)
+  document.getElementById('ov-add-item-comanda').classList.add('open')
+}
+
+function filtrarAddItemComanda(){
+  var q=document.getElementById('aic-busca').value.toLowerCase()
+  renderAddItemComandaLista(prods.filter(function(p){return p.nome.toLowerCase().indexOf(q)>-1}))
+}
+
+function renderAddItemComandaLista(lista){
+  var el=document.getElementById('aic-lista')
+  if(!lista.length){el.innerHTML='<div class="empty">Nenhum produto encontrado</div>';return}
+  el.innerHTML=lista.map(function(p){
+    var qty=addItemComandaTemp[p.id]||0
+    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">'+
+      '<span style="font-size:18px">'+(p.emoji||'&#x1F4E6;')+'</span>'+
+      '<div style="flex:1"><div style="font-size:13px;font-weight:500">'+p.nome+'</div><div style="font-size:11px;color:var(--txt3)">R$ '+Number(p.preco_venda).toFixed(2)+'</div></div>'+
+      '<div class="ci-qty">'+
+        '<button onclick="mudarQtyAddItem(\''+p.id+'\',-1)">-</button>'+
+        '<span id="aic-qty-'+p.id+'">'+qty+'</span>'+
+        '<button onclick="mudarQtyAddItem(\''+p.id+'\',1)">+</button>'+
+      '</div>'+
+    '</div>'
+  }).join('')+'<div class="modal-ft" style="margin-top:12px"><button class="btn acc" style="width:100%;justify-content:center" onclick="confirmarAddItensComanda()">Adicionar ao pedido</button></div>'
+}
+
+function mudarQtyAddItem(produtoId,delta){
+  var atual=addItemComandaTemp[produtoId]||0
+  atual=Math.max(0,atual+delta)
+  if(atual===0)delete addItemComandaTemp[produtoId]
+  else addItemComandaTemp[produtoId]=atual
+  var span=document.getElementById('aic-qty-'+produtoId)
+  if(span)span.textContent=atual
+}
+
+async function confirmarAddItensComanda(){
+  var ids=Object.keys(addItemComandaTemp)
+  if(!ids.length){toast('Escolha ao menos um item',1);return}
+  var linhas=ids.map(function(pid){
+    var p=prods.find(function(x){return x.id===pid})
+    return{comanda_id:comandaAtualId,produto_id:pid,produto_nome:p.nome,qtd:addItemComandaTemp[pid],preco_unit:Number(p.preco_venda),status:'em_preparo',origem:'garcom',lancado_por:userLogado.nome,impresso:false}
+  })
+  await db.from('itens_comanda').insert(linhas)
+  await db.from('mesas').update({status:'ocupada'}).eq('id',mesaAtualId)
+  document.getElementById('ov-add-item-comanda').classList.remove('open')
+  toast('Pedido enviado para a cozinha!')
+  await renderComanda()
+  imprimirItensNovosComanda()
+}
+
+async function imprimirItensNovosComanda(){
+  var res=await db.from('itens_comanda').select('*').eq('comanda_id',comandaAtualId).eq('impresso',false).neq('status','cancelado')
+  var novos=res.data||[]
+  if(!novos.length)return
+  var m=mesasCache.find(function(x){return x.id===mesaAtualId})
+  var now=new Date()
+  var linhas=novos.map(function(it){
+    return '<div>'+it.qtd+'x '+it.produto_nome+'</div>'+(it.observacoes?'<div style="font-size:10px;color:#555">Obs: '+it.observacoes+'</div>':'')
+  }).join('')
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><style>'+
+    '*{margin:0;padding:0;box-sizing:border-box}body{font-family:"Courier New",monospace;font-size:12px;width:80mm;background:#fff;color:#000;padding:3mm}'+
+    '.c{text-align:center}.b{font-weight:bold}.linha{border-top:1px dashed #000;margin:4px 0}'+
+    '@media print{body{width:80mm}}</style></head><body>'+
+    '<div class="c b" style="font-size:16px">MESA '+(m?m.numero:'')+'</div>'+
+    '<div class="c">'+now.toLocaleTimeString('pt-BR')+' - '+now.toLocaleDateString('pt-BR')+'</div>'+
+    '<div class="linha"></div>'+linhas+'<div class="linha"></div>'+
+    '<div class="c" style="font-size:10px">Garcom: '+userLogado.nome+'</div>'+
+    '<script>window.onafterprint=function(){window.close()}<\/script>'+
+    '</body></html>'
+  var w=window.open('','_blank','width=320,height=600')
+  w.document.write(html);w.document.close()
+  setTimeout(function(){w.print()},500)
+  var idsImpressos=novos.map(function(it){return it.id})
+  await db.from('itens_comanda').update({impresso:true}).in('id',idsImpressos)
+}
+
+// Cancelamento de item (nunca deleta — soft cancel + senha de gerente + registra em excecoes)
+var itemParaCancelarId=null
+function abrirCancelarItem(itemId){
+  itemParaCancelarId=itemId
+  document.getElementById('ci-motivo').value=''
+  document.getElementById('ci-senha').value=''
+  document.getElementById('ov-cancelar-item').classList.add('open')
+}
+
+async function confirmarCancelarItem(){
+  var motivo=document.getElementById('ci-motivo').value.trim()
+  var senha=document.getElementById('ci-senha').value
+  if(!motivo){toast('Informe o motivo',1);return}
+  if(!senha){toast('Informe a senha',1);return}
+  var res=await db.from('usuarios').select('*').eq('senha',senha).eq('ativo',true).in('nivel',['gerente','admin','superadmin']).limit(1)
+  var gerente=(res.data&&res.data[0])
+  if(!gerente){toast('Senha invalida',1);return}
+  var item=itensComandaCache.find(function(x){return x.id===itemParaCancelarId})
+  await db.from('itens_comanda').update({status:'cancelado',cancelado_motivo:motivo,cancelado_por:userLogado.nome,cancelado_em:new Date().toISOString()}).eq('id',itemParaCancelarId)
+  document.getElementById('ov-cancelar-item').classList.remove('open')
+  if(item){
+    registrarExcecao('ITEM DE COMANDA CANCELADO',item.qtd+'x '+item.produto_nome+' — Motivo: '+motivo+' (autorizado por '+gerente.nome+')',Number(item.preco_unit)*item.qtd)
+  }
+  toast('Item cancelado')
+  renderComanda()
+}
+
+// Fechar comanda
+function abrirFecharComanda(){
+  var total=itensComandaCache.filter(function(it){return it.status!=='cancelado'}).reduce(function(a,it){return a+Number(it.preco_unit)*it.qtd},0)
+  if(!total){toast('Nao ha itens para fechar',1);return}
+  document.getElementById('fc-total').textContent='R$ '+total.toFixed(2)
+  document.getElementById('ov-fechar-comanda').classList.add('open')
+}
+
+async function fecharComandaComPagamento(metodo){
+  var total=itensComandaCache.filter(function(it){return it.status!=='cancelado'}).reduce(function(a,it){return a+Number(it.preco_unit)*it.qtd},0)
+  await db.from('comandas').update({status:'fechada',forma_pagamento:metodo,valor_total:total,fechada_em:new Date().toISOString()}).eq('id',comandaAtualId)
+  await db.from('mesas').update({status:'livre',garcom_nome:null,comanda_atual_id:null,aberta_em:null}).eq('id',mesaAtualId)
+  document.getElementById('ov-fechar-comanda').classList.remove('open')
+  if(comandaTimerInterval)clearInterval(comandaTimerInterval)
+  toast('Conta fechada! Mesa liberada.')
+  imprimirFechamentoComanda(metodo,total)
+  go('mesas')
+  renderMesas()
+}
+
+function imprimirFechamentoComanda(metodo,total){
+  var m=mesasCache.find(function(x){return x.id===mesaAtualId})
+  var loja=localStorage.getItem('nome_loja')||'CONVENFACIL'
+  var rodape=localStorage.getItem('rodape_cupom')||'Obrigado pela preferencia!'
+  var now=new Date()
+  var itensHtml=itensComandaCache.filter(function(it){return it.status!=='cancelado'}).map(function(it){
+    return '<div style="display:flex;justify-content:space-between"><span>'+it.qtd+'x '+it.produto_nome+'</span><span>R$ '+(Number(it.preco_unit)*it.qtd).toFixed(2)+'</span></div>'
+  }).join('')
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><style>'+
+    '*{margin:0;padding:0;box-sizing:border-box}body{font-family:"Courier New",monospace;font-size:11px;width:80mm;background:#fff;color:#000;padding:3mm}'+
+    '.c{text-align:center}.b{font-weight:bold}.g{font-size:14px}.linha{border-top:1px dashed #000;margin:4px 0}'+
+    '@media print{body{width:80mm}}</style></head><body>'+
+    '<div class="c b" style="font-size:14px">'+loja+'</div>'+
+    '<div class="c">'+now.toLocaleDateString('pt-BR')+' '+now.toLocaleTimeString('pt-BR')+'</div>'+
+    '<div class="linha"></div><div class="c b">MESA '+(m?m.numero:'')+' — FECHAMENTO</div><div class="linha"></div>'+
+    itensHtml+'<div class="linha"></div>'+
+    '<div style="display:flex;justify-content:space-between" class="b g"><span>TOTAL:</span><span>R$ '+total.toFixed(2)+'</span></div>'+
+    '<div style="display:flex;justify-content:space-between"><span>Pagamento:</span><span>'+metodo+'</span></div>'+
+    '<div class="linha"></div><div class="c" style="font-size:10px">'+rodape+'</div>'+
+    '<script>window.onafterprint=function(){window.close()}<\/script>'+
+    '</body></html>'
+  var w=window.open('','_blank','width=320,height=600')
+  w.document.write(html);w.document.close()
+  setTimeout(function(){w.print()},500)
+}
+
+// KDS — painel da cozinha
+async function renderKds(){
+  iniciarRealtimeMesas()
+  var res=await db.from('itens_comanda').select('*').in('status',['em_preparo','pronto']).order('lancado_em')
+  var itens=res.data||[]
+  var grid=document.getElementById('kds-grid')
+  if(!itens.length){grid.innerHTML='<div class="empty">Nenhum pedido em producao</div>';return}
+  var porComanda={}
+  itens.forEach(function(it){
+    if(!porComanda[it.comanda_id])porComanda[it.comanda_id]=[]
+    porComanda[it.comanda_id].push(it)
+  })
+  var comandaIds=Object.keys(porComanda)
+  var resComandas=await db.from('comandas').select('*').in('id',comandaIds)
+  var comandasMap={}
+  ;(resComandas.data||[]).forEach(function(c){comandasMap[c.id]=c})
+  grid.innerHTML=comandaIds.map(function(cid){
+    var itensDaComanda=porComanda[cid]
+    var c=comandasMap[cid]
+    var mesaNum=c?c.mesa_numero:'?'
+    var tempo=c?tempoDecorrido(c.aberta_em):''
+    return '<div style="background:var(--bg1);border:1px solid var(--border);border-radius:var(--rad2);padding:14px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'+
+        '<div style="font-size:17px;font-weight:800">Mesa '+mesaNum+'</div>'+
+        '<div style="font-size:11px;color:var(--txt3)">'+tempo+'</div>'+
+      '</div>'+
+      itensDaComanda.map(function(it){
+        return '<div style="padding:8px 0;border-bottom:1px solid var(--border)">'+
+          '<div style="font-size:13px;font-weight:600">'+it.qtd+'x '+it.produto_nome+'</div>'+
+          (it.observacoes?'<div style="font-size:11px;color:var(--txt3)">'+it.observacoes+'</div>':'')+
+          '<div style="display:flex;gap:6px;margin-top:6px">'+
+            (it.status==='em_preparo'?'<button class="btn sm grn" onclick="avancarStatusItemKds(\''+it.id+'\',\'pronto\')">&#x2705; Marcar pronto</button>':'')+
+            (it.status==='pronto'?'<button class="btn sm" onclick="avancarStatusItemKds(\''+it.id+'\',\'entregue\')">&#x2714; Marcar entregue</button>':'')+
+          '</div>'+
+        '</div>'
+      }).join('')+
+    '</div>'
+  }).join('')
+}
+
+async function avancarStatusItemKds(itemId,novoStatus){
+  await db.from('itens_comanda').update({status:novoStatus}).eq('id',itemId)
+  renderKds()
+  var secComanda=document.getElementById('sec-comanda')
+  if(mesaAtualId&&secComanda&&secComanda.classList.contains('on'))renderComanda()
+}
+
+// Tempo real (Supabase Realtime) — mantem mapa de mesas e KDS atualizados sozinhos, sem precisar recarregar
+var mesasRealtimeIniciado=false
+function iniciarRealtimeMesas(){
+  if(mesasRealtimeIniciado)return
+  mesasRealtimeIniciado=true
+  db.channel('mesas-realtime')
+    .on('postgres_changes',{event:'*',schema:'public',table:'mesas'},function(){
+      var sec=document.getElementById('sec-mesas')
+      if(sec&&sec.classList.contains('on'))renderMesas()
+    })
+    .on('postgres_changes',{event:'*',schema:'public',table:'itens_comanda'},function(){
+      var secKds=document.getElementById('sec-kds')
+      var secComanda=document.getElementById('sec-comanda')
+      if(secKds&&secKds.classList.contains('on'))renderKds()
+      if(secComanda&&secComanda.classList.contains('on'))renderComanda()
+    })
+    .subscribe()
 }
 
 // TOAST
