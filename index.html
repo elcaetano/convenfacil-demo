@@ -372,8 +372,10 @@ tr:hover td{background:var(--bg2)}
           <span class="arrow">&#x25B6;</span>
         </div>
         <div class="nav-items" id="grp-estoque-items">
-          <div class="nav-item" id="nav-estoque" onclick="go('estoque',this)"><span class="nav-ic">&#x1F4E6;</span><span>Produtos em estoque</span></div>
-          <div class="nav-item" id="nav-lista-compras" onclick="go('listacompras',this)"><span class="nav-ic">&#x1F6D2;</span><span>Lista de Compras</span></div>
+          <div class="nav-item" id="nav-add-prod" onclick="go('estoque',document.getElementById('nav-estoque'));openModal('prod')"><span class="nav-ic">&#x2795;</span><span>Adicionar produto</span></div>
+          <div class="nav-item" id="nav-baixa-estragado" onclick="abrirBaixaEstragado()"><span class="nav-ic">&#x1F5D1;</span><span>Baixar estragado</span></div>
+          <div class="nav-item" id="nav-estoque" onclick="go('estoque',this)"><span class="nav-ic">&#x1F4E6;</span><span>Conferir estoque</span></div>
+          <div class="nav-item" id="nav-lista-compras" onclick="go('listacompras',this)"><span class="nav-ic">&#x1F6D2;</span><span>Lista p/ Mercado</span></div>
         </div>
       </div>
       <!-- FINANCEIRO -->
@@ -1012,6 +1014,29 @@ tr:hover td{background:var(--bg2)}
   </div>
 </div>
 
+<!-- MODAL BAIXAR ESTRAGADO -->
+<div class="ov" id="ov-baixa-estragado">
+  <div class="modal" style="max-width:420px">
+    <div style="font-size:36px;text-align:center;margin-bottom:10px">&#x1F5D1;</div>
+    <h2 style="text-align:center">Baixar produto estragado</h2>
+    <p style="color:var(--txt2);font-size:13px;margin-bottom:16px;text-align:center">Escolha o produto e a quantidade a descontar do estoque</p>
+    <div class="fg">
+      <label>Produto</label>
+      <select id="be-produto-sel" style="width:100%">
+        <option value="">-- Selecione --</option>
+      </select>
+    </div>
+    <div class="fg">
+      <label>Quantidade a baixar</label>
+      <input type="number" id="be-qtd" min="1" step="1" placeholder="Ex: 2" style="width:100%">
+    </div>
+    <div class="modal-ft">
+      <button class="btn" onclick="closeModals()">Cancelar</button>
+      <button class="btn red" onclick="confirmarBaixaEstragado()">&#x2713; Confirmar baixa</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL FIADO - SELECIONAR CLIENTE -->
 <div class="ov" id="ov-fiado-cliente">
   <div class="modal" style="max-width:420px">
@@ -1581,6 +1606,32 @@ function renderEstoque(){
   var alrt=document.getElementById('alrt')
   if(baixos.length){alrt.style.display='flex';document.getElementById('alrt-msg').textContent=baixos.length+' produto(s) com estoque baixo: '+baixos.map(function(p){return p.nome}).join(', ')}
   else alrt.style.display='none'
+}
+
+function abrirBaixaEstragado(){
+  if(!prods.length){toast('Nenhum produto cadastrado',1);return}
+  var sel=document.getElementById('be-produto-sel')
+  sel.innerHTML='<option value="">-- Selecione --</option>'+prods.map(function(p){
+    return'<option value="'+p.id+'">'+p.nome+' (estoque: '+p.estoque+')</option>'
+  }).join('')
+  document.getElementById('be-qtd').value=''
+  document.getElementById('ov-baixa-estragado').classList.add('open')
+}
+
+async function confirmarBaixaEstragado(){
+  var produtoId=document.getElementById('be-produto-sel').value
+  var qtd=parseInt(document.getElementById('be-qtd').value)
+  if(!produtoId){toast('Selecione um produto',1);return}
+  if(!qtd||qtd<1){toast('Informe uma quantidade valida',1);return}
+  var p=prods.find(function(x){return x.id===produtoId})
+  if(!p){toast('Produto nao encontrado',1);return}
+  var novoEstoque=Math.max(p.estoque-qtd,0)
+  var res=await db.from('produtos').update({estoque:novoEstoque}).eq('id',produtoId)
+  if(res.error){toast('Erro ao baixar estoque',1);return}
+  p.estoque=novoEstoque
+  closeModals()
+  toast('Baixa realizada: -'+qtd+' '+p.nome)
+  renderEstoque();renderPDV();updateBadge()
 }
 
 function renderListaCompras(){
