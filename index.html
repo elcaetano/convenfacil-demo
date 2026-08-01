@@ -526,6 +526,7 @@ tr:hover td{background:var(--bg2)}
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
           <button class="btn acc" onclick="abrirAddItemComanda()">&#x2795; Adicionar item</button>
+          <button class="btn yellow" onclick="pedirContaMesa()">&#x1F9FE; Pedir conta</button>
           <button class="btn grn" onclick="abrirFecharComanda()">&#x2705; Fechar conta</button>
         </div>
       </div>
@@ -3471,6 +3472,12 @@ async function cancelarItemSilencioso(itemId){
   var m=mesasCache.find(function(x){return x.id===mesaAtualId})
   registrarExcecao('ITEM DE COMANDA CANCELADO',(m?'Mesa '+m.numero+' — ':'')+item.qtd+'x '+item.produto_nome,Number(item.preco_unit)*item.qtd)
   renderComanda()
+}
+
+// Sinalizar no mapa que o cliente pediu a conta (fica amarelo pros outros garcons verem)
+async function pedirContaMesa(){
+  await db.from('mesas').update({status:'conta_solicitada'}).eq('id',mesaAtualId)
+  toast('Mesa marcada: conta solicitada')
 }
 
 // Fechar comanda
