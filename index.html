@@ -375,6 +375,8 @@ tr:hover td{background:var(--bg2)}
           <div class="nav-item" id="nav-add-prod" onclick="go('estoque',document.getElementById('nav-estoque'));openModal('prod')"><span class="nav-ic">&#x2795;</span><span>Adicionar produto</span></div>
           <div class="nav-item" id="nav-baixa-estragado" onclick="abrirBaixaEstragado()"><span class="nav-ic">&#x1F5D1;</span><span>Baixar estragado</span></div>
           <div class="nav-item" id="nav-estoque" onclick="go('estoque',this)"><span class="nav-ic">&#x1F4E6;</span><span>Conferir estoque</span></div>
+          <div class="nav-item" id="nav-categorias" onclick="go('categorias',this)"><span class="nav-ic">&#x1F3F7;</span><span>Categorias</span></div>
+          <div class="nav-item" id="nav-historico-reposicao" onclick="go('historicoreposicao',this)"><span class="nav-ic">&#x1F4CB;</span><span>Historico de Reposicao</span></div>
           <div class="nav-item" id="nav-lista-compras" onclick="go('listacompras',this)"><span class="nav-ic">&#x1F6D2;</span><span>Lista p/ Mercado</span></div>
         </div>
       </div>
@@ -482,7 +484,7 @@ tr:hover td{background:var(--bg2)}
       <div class="topbar"><h1>Estoque</h1><button class="btn acc" onclick="openModal('prod')">+ Adicionar</button></div>
       <div class="sec-body">
         <div class="alert-bar" id="alrt">&#x26A0;&#xFE0F; <span id="alrt-msg"></span></div>
-        <div class="tbl"><table><thead><tr><th>Produto</th><th>Categoria</th><th>Estoque</th><th>Minimo</th><th>Custo</th><th>Venda</th><th>Margem</th><th>Status</th><th></th></tr></thead><tbody id="stk-tb"></tbody></table></div>
+        <div class="tbl"><table><thead><tr><th>Produto</th><th>Categoria</th><th>Estoque</th><th>Minimo</th><th>Custo</th><th>Venda</th><th>Margem</th><th>Status</th><th>Validade</th><th></th></tr></thead><tbody id="stk-tb"></tbody></table></div>
       </div>
     </div>
 
@@ -492,6 +494,26 @@ tr:hover td{background:var(--bg2)}
       <div class="sec-body">
         <p style="font-size:13px;color:var(--txt2);margin-bottom:14px">Produtos com estoque baixo ou zerado. Quantidade sugerida = estoque minimo x2 menos o que ja tem.</p>
         <div class="tbl"><table><thead><tr><th>Produto</th><th>Categoria</th><th>Estoque atual</th><th>Minimo</th><th>Sugestao de compra</th></tr></thead><tbody id="lc-tb"></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- HISTORICO DE REPOSICAO -->
+    <div class="sec" id="sec-historico-reposicao">
+      <div class="topbar"><h1>Historico de Reposicao</h1></div>
+      <div class="sec-body">
+        <div class="tbl"><table><thead><tr><th>Data</th><th>Produto</th><th>Quantidade</th></tr></thead><tbody id="hr-tb"></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- CATEGORIAS -->
+    <div class="sec" id="sec-categorias">
+      <div class="topbar"><h1>Categorias de Produtos</h1></div>
+      <div class="sec-body">
+        <div class="fgrid c2" style="margin-bottom:16px;align-items:end">
+          <div class="fg"><label>Nova categoria</label><input type="text" id="cat-nova-nome" placeholder="Ex: Bebidas"></div>
+          <button class="btn acc" onclick="addCategoria()" style="height:38px">+ Adicionar</button>
+        </div>
+        <div class="tbl"><table><thead><tr><th>Nome</th><th></th></tr></thead><tbody id="cat-tb"></tbody></table></div>
       </div>
     </div>
 
@@ -727,21 +749,7 @@ tr:hover td{background:var(--bg2)}
     <div class="fgrid c1"><div class="fg"><label>Nome</label><input type="text" id="np-n" placeholder="Ex: Agua Mineral 500ml"></div></div>
     <div class="fgrid c3">
       <div class="fg"><label>Codigo de barras</label><input type="text" id="np-c" placeholder="7891234567890"></div>
-      <div class="fg"><label>Categoria</label><select id="np-cat"><option>Bebidas</option>
-<option>Energeticos</option>
-<option>Snacks e Salgadinhos</option>
-<option>Chocolates e Doces</option>
-<option>Laticinios</option>
-<option>Alimentacao Rapida</option>
-<option>Tabacaria</option>
-<option>Higiene Pessoal</option>
-<option>Preservativos</option>
-<option>Medicamentos OTC</option>
-<option>Limpeza</option>
-<option>Eletronicos e Acessorios</option>
-<option>Recarga e Servicos</option>
-<option>Loteria e Jogos</option>
-<option>Outros</option></select></div>
+      <div class="fg"><label>Categoria</label><select id="np-cat"></select></div>
       <div class="fg"><label>Emoji</label><input type="text" id="np-e" placeholder="🥤" maxlength="2"></div>
     </div>
     <div class="fgrid c3">
@@ -749,7 +757,7 @@ tr:hover td{background:var(--bg2)}
       <div class="fg"><label>Venda (R$)</label><input type="number" id="np-v" placeholder="0.00" step="0.01" min="0"></div>
       <div class="fg"><label>Estoque</label><input type="number" id="np-q" placeholder="0" min="0"></div>
     </div>
-    <div class="fgrid c2"><div class="fg"><label>Estoque minimo</label><input type="number" id="np-m" placeholder="5" min="0"></div></div>
+    <div class="fgrid c2"><div class="fg"><label>Estoque minimo</label><input type="number" id="np-m" placeholder="5" min="0"></div><div class="fg"><label>Validade (opcional)</label><input type="date" id="np-val"></div></div>
     <div class="modal-ft"><button class="btn" onclick="closeModals()">Cancelar</button><button class="btn acc" onclick="saveProd()">Salvar</button></div>
   </div>
 </div>
@@ -1136,6 +1144,7 @@ function iniciarApp(){
   document.getElementById('sf-nivel').textContent=userLogado.nivel
   ajustarMenuPorNivel()
   loadProds();loadPromos()
+  carregarCategorias().then(preencherSelectCategorias)
   tick();setInterval(tick,30000)
 }
 
@@ -1196,6 +1205,8 @@ function go(id,el){
   if(el)el.classList.add('on')
   if(id==='estoque')renderEstoque()
   if(id==='listacompras')renderListaCompras()
+  if(id==='historicoreposicao')renderHistoricoReposicao()
+  if(id==='categorias')renderCategorias()
   if(id==='fin')renderFin()
   if(id==='prods')renderProds()
   if(id==='users')renderUsers()
@@ -1582,12 +1593,13 @@ function editPromo(id){
 // ESTOQUE
 function renderEstoque(){
   var tb=document.getElementById('stk-tb')
-  if(!prods.length){tb.innerHTML='<tr><td colspan="9"><div class="empty">Nenhum produto</div></td></tr>';return}
+  if(!prods.length){tb.innerHTML='<tr><td colspan="10"><div class="empty">Nenhum produto</div></td></tr>';return}
   tb.innerHTML=prods.map(function(p){
     var st=p.estoque===0?'out':p.estoque<=p.estoque_minimo?'low':'ok'
     var lb=p.estoque===0?'Zerado':p.estoque<=p.estoque_minimo?'Baixo':'Normal'
     var mg=p.preco_custo>0?(((p.preco_venda-p.preco_custo)/p.preco_custo)*100).toFixed(0):0
     var cor=p.estoque===0?'var(--red)':p.estoque<=p.estoque_minimo?'var(--yellow)':'var(--txt1)'
+    var vencInfo=infoValidade(p.validade)
     return'<tr>'+
       '<td><span style="margin-right:7px;font-size:16px">'+(p.emoji||'&#x1F4E6;')+'</span><strong>'+p.nome+'</strong></td>'+
       '<td><span class="tag bl">'+(p.categoria||'-')+'</span></td>'+
@@ -1597,15 +1609,32 @@ function renderEstoque(){
       '<td style="color:var(--acc);font-weight:600">R$ '+Number(p.preco_venda).toFixed(2)+'</td>'+
       '<td><span class="tag '+(parseInt(mg)>=30?'ok':parseInt(mg)>=15?'low':'out')+'">'+mg+'%</span></td>'+
       '<td><span class="tag '+st+'">'+lb+'</span></td>'+
+      '<td style="color:'+vencInfo.cor+';font-weight:600;font-size:12px">'+vencInfo.texto+'</td>'+
       '<td style="display:flex;gap:5px">'+
         '<button class="btn sm" onclick="restock(\''+p.id+'\')">+ Repor</button>'+
-        (perm('editar')?'<button class="btn sm yellow" onclick="editProd(\''+p.id+'\')">&#x270F;</button>':'')+'</td>'+
+        (perm('editar')?'<button class="btn sm yellow" onclick="editProd(\''+p.id+'\')">&#x270F;</button>':'')+
+        (perm('excluir')?'<button class="btn sm red" onclick="delProd(\''+p.id+'\')">&#x1F5D1;</button>':'')+'</td>'+
     '</tr>'
   }).join('')
   var baixos=prods.filter(function(p){return p.estoque<=p.estoque_minimo})
+  var vencendo=prods.filter(function(p){return infoValidade(p.validade).alerta})
   var alrt=document.getElementById('alrt')
-  if(baixos.length){alrt.style.display='flex';document.getElementById('alrt-msg').textContent=baixos.length+' produto(s) com estoque baixo: '+baixos.map(function(p){return p.nome}).join(', ')}
+  var partes=[]
+  if(baixos.length)partes.push(baixos.length+' produto(s) com estoque baixo: '+baixos.map(function(p){return p.nome}).join(', '))
+  if(vencendo.length)partes.push(vencendo.length+' produto(s) vencido(s) ou vencendo em breve: '+vencendo.map(function(p){return p.nome}).join(', '))
+  if(partes.length){alrt.style.display='flex';document.getElementById('alrt-msg').textContent=partes.join(' | ')}
   else alrt.style.display='none'
+}
+
+function infoValidade(validade){
+  if(!validade)return{texto:'-',cor:'var(--txt3)',alerta:false}
+  var hoje=new Date();hoje.setHours(0,0,0,0)
+  var v=new Date(validade+'T00:00:00')
+  var dias=Math.round((v-hoje)/86400000)
+  var txt=v.toLocaleDateString('pt-BR')
+  if(dias<0)return{texto:txt+' (vencido)',cor:'var(--red)',alerta:true}
+  if(dias<=7)return{texto:txt+' (vence em '+dias+'d)',cor:'var(--yellow)',alerta:true}
+  return{texto:txt,cor:'var(--txt2)',alerta:false}
 }
 
 function abrirBaixaEstragado(){
@@ -1687,9 +1716,75 @@ async function restock(id){
   if(qtd>0){
     var ne=p.estoque+qtd
     await db.from('produtos').update({estoque:ne}).eq('id',id)
+    await db.from('reposicoes_estoque').insert({produto_id:id,produto_nome:p.nome,quantidade:qtd})
     p.estoque=ne;renderEstoque();renderPDV();updateBadge()
     toast('+'+qtd+' unidades!')
   }
+}
+
+var CATEGORIAS_PADRAO=['Bebidas','Energeticos','Snacks e Salgadinhos','Chocolates e Doces','Laticinios','Alimentacao Rapida','Tabacaria','Higiene Pessoal','Preservativos','Medicamentos OTC','Limpeza','Eletronicos e Acessorios','Recarga e Servicos','Loteria e Jogos','Outros']
+var categoriasCache=[]
+
+async function carregarCategorias(){
+  var res=await db.from('categorias').select('*').order('nome')
+  var lista=res.data||[]
+  if(!lista.length){
+    await db.from('categorias').insert(CATEGORIAS_PADRAO.map(function(n){return{nome:n}}))
+    res=await db.from('categorias').select('*').order('nome')
+    lista=res.data||[]
+  }
+  categoriasCache=lista
+  return lista
+}
+
+function preencherSelectCategorias(){
+  var sel=document.getElementById('np-cat')
+  var atual=sel.value
+  sel.innerHTML=categoriasCache.map(function(c){return'<option>'+c.nome+'</option>'}).join('')
+  if(atual)sel.value=atual
+}
+
+async function renderCategorias(){
+  await carregarCategorias()
+  preencherSelectCategorias()
+  var tb=document.getElementById('cat-tb')
+  if(!categoriasCache.length){tb.innerHTML='<tr><td colspan="2"><div class="empty">Nenhuma categoria cadastrada</div></td></tr>';return}
+  tb.innerHTML=categoriasCache.map(function(c){
+    return'<tr><td><strong>'+c.nome+'</strong></td>'+
+      '<td><button class="btn sm red" onclick="delCategoria(\''+c.id+'\')">Excluir</button></td></tr>'
+  }).join('')
+}
+
+async function addCategoria(){
+  var nome=document.getElementById('cat-nova-nome').value.trim()
+  if(!nome){toast('Informe o nome da categoria',1);return}
+  var res=await db.from('categorias').insert({nome:nome})
+  if(res.error){toast('Erro ao cadastrar categoria',1);return}
+  document.getElementById('cat-nova-nome').value=''
+  toast('Categoria cadastrada!')
+  renderCategorias()
+}
+
+async function delCategoria(id){
+  if(!confirm('Excluir esta categoria? Produtos ja cadastrados com ela nao serao alterados.'))return
+  await db.from('categorias').delete().eq('id',id)
+  toast('Categoria excluida')
+  renderCategorias()
+}
+
+async function renderHistoricoReposicao(){
+  var tb=document.getElementById('hr-tb')
+  var res=await db.from('reposicoes_estoque').select('*').order('criado_em',{ascending:false}).limit(200)
+  var lista=res.data||[]
+  if(!lista.length){tb.innerHTML='<tr><td colspan="3"><div class="empty">Nenhuma reposicao registrada ainda</div></td></tr>';return}
+  tb.innerHTML=lista.map(function(r){
+    var dt=new Date(r.criado_em).toLocaleString('pt-BR')
+    return'<tr>'+
+      '<td style="color:var(--txt2)">'+dt+'</td>'+
+      '<td><strong>'+(r.produto_nome||'-')+'</strong></td>'+
+      '<td style="color:var(--green);font-weight:700">+'+r.quantidade+'</td>'+
+    '</tr>'
+  }).join('')
 }
 
 function updateBadge(){
@@ -1954,6 +2049,7 @@ function editProd(id){
   document.getElementById('np-v').value=p.preco_venda
   document.getElementById('np-q').value=p.estoque
   document.getElementById('np-m').value=p.estoque_minimo
+  document.getElementById('np-val').value=p.validade||''
   document.getElementById('ov-prod').classList.add('open')
 }
 
@@ -2125,7 +2221,7 @@ function openModal(tipo){
   if(tipo==='prod'){
     document.getElementById('prod-modal-title').textContent='Cadastrar produto'
     document.getElementById('np-id').value=''
-    ;['np-n','np-c','np-e','np-k','np-v','np-q','np-m'].forEach(function(id){document.getElementById(id).value=''})
+    ;['np-n','np-c','np-e','np-k','np-v','np-q','np-m','np-val'].forEach(function(id){document.getElementById(id).value=''})
   }
   if(tipo==='promo'){
     document.getElementById('promo-modal-title').textContent='Nova promoção'
@@ -2162,7 +2258,7 @@ async function saveProd(){
   var nome=document.getElementById('np-n').value.trim()
   if(!nome){toast('Informe o nome',1);return}
   var id=document.getElementById('np-id').value
-  var prod={nome:nome,codigo_barras:document.getElementById('np-c').value||null,categoria:document.getElementById('np-cat').value,emoji:document.getElementById('np-e').value||'&#x1F4E6;',preco_custo:parseFloat(document.getElementById('np-k').value)||0,preco_venda:parseFloat(document.getElementById('np-v').value)||0,estoque:parseInt(document.getElementById('np-q').value)||0,estoque_minimo:parseInt(document.getElementById('np-m').value)||5}
+  var prod={nome:nome,codigo_barras:document.getElementById('np-c').value||null,categoria:document.getElementById('np-cat').value,emoji:document.getElementById('np-e').value||'&#x1F4E6;',preco_custo:parseFloat(document.getElementById('np-k').value)||0,preco_venda:parseFloat(document.getElementById('np-v').value)||0,estoque:parseInt(document.getElementById('np-q').value)||0,estoque_minimo:parseInt(document.getElementById('np-m').value)||5,validade:document.getElementById('np-val').value||null}
   if(id){
     var res=await db.from('produtos').update(prod).eq('id',id).select().single()
     if(res.error){toast('Erro ao atualizar',1);return}
