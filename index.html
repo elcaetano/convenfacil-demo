@@ -367,11 +367,14 @@ tr:hover td{background:var(--bg2)}
       </div>
       <!-- ESTOQUE -->
       <div class="nav-group" id="grp-estoque">
-        <div class="nav-group-header" onclick="go('estoque',document.getElementById('nav-estoque-item'))" style="cursor:pointer">
+        <div class="nav-group-header" onclick="toggleGrp('estoque')">
           <span>&#x1F4E6; Estoque <span class="badge" id="bdg" style="display:none">0</span></span>
           <span class="arrow">&#x25B6;</span>
         </div>
-        <div id="nav-estoque-item" style="display:none"></div>
+        <div class="nav-items" id="grp-estoque-items">
+          <div class="nav-item" id="nav-estoque" onclick="go('estoque',this)"><span class="nav-ic">&#x1F4E6;</span><span>Produtos em estoque</span></div>
+          <div class="nav-item" id="nav-lista-compras" onclick="go('listacompras',this)"><span class="nav-ic">&#x1F6D2;</span><span>Lista de Compras</span></div>
+        </div>
       </div>
       <!-- FINANCEIRO -->
       <div class="nav-group" id="grp-fin">
@@ -478,6 +481,15 @@ tr:hover td{background:var(--bg2)}
       <div class="sec-body">
         <div class="alert-bar" id="alrt">&#x26A0;&#xFE0F; <span id="alrt-msg"></span></div>
         <div class="tbl"><table><thead><tr><th>Produto</th><th>Categoria</th><th>Estoque</th><th>Minimo</th><th>Custo</th><th>Venda</th><th>Margem</th><th>Status</th><th></th></tr></thead><tbody id="stk-tb"></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- LISTA DE COMPRAS -->
+    <div class="sec" id="sec-listacompras">
+      <div class="topbar"><h1>Lista de Compras</h1><button class="btn acc" onclick="imprimirListaCompras()">&#x1F5A8; Imprimir</button></div>
+      <div class="sec-body">
+        <p style="font-size:13px;color:var(--txt2);margin-bottom:14px">Produtos com estoque baixo ou zerado. Quantidade sugerida = estoque minimo x2 menos o que ja tem.</p>
+        <div class="tbl"><table><thead><tr><th>Produto</th><th>Categoria</th><th>Estoque atual</th><th>Minimo</th><th>Sugestao de compra</th></tr></thead><tbody id="lc-tb"></tbody></table></div>
       </div>
     </div>
 
@@ -1158,6 +1170,7 @@ function go(id,el){
   if(sec)sec.classList.add('on')
   if(el)el.classList.add('on')
   if(id==='estoque')renderEstoque()
+  if(id==='listacompras')renderListaCompras()
   if(id==='fin')renderFin()
   if(id==='prods')renderProds()
   if(id==='users')renderUsers()
@@ -1568,6 +1581,52 @@ function renderEstoque(){
   var alrt=document.getElementById('alrt')
   if(baixos.length){alrt.style.display='flex';document.getElementById('alrt-msg').textContent=baixos.length+' produto(s) com estoque baixo: '+baixos.map(function(p){return p.nome}).join(', ')}
   else alrt.style.display='none'
+}
+
+function renderListaCompras(){
+  var tb=document.getElementById('lc-tb')
+  var baixos=prods.filter(function(p){return p.estoque<=p.estoque_minimo})
+  if(!baixos.length){tb.innerHTML='<tr><td colspan="5"><div class="empty">Nenhum produto com estoque baixo. Tudo certo por aqui!</div></td></tr>';return}
+  tb.innerHTML=baixos.map(function(p){
+    var sugestao=Math.max((p.estoque_minimo*2)-p.estoque,p.estoque_minimo)
+    var cor=p.estoque===0?'var(--red)':'var(--yellow)'
+    return'<tr>'+
+      '<td><span style="margin-right:7px;font-size:16px">'+(p.emoji||'&#x1F4E6;')+'</span><strong>'+p.nome+'</strong></td>'+
+      '<td><span class="tag bl">'+(p.categoria||'-')+'</span></td>'+
+      '<td style="font-weight:700;color:'+cor+'">'+p.estoque+'</td>'+
+      '<td style="color:var(--txt3)">'+p.estoque_minimo+'</td>'+
+      '<td style="font-weight:700;color:var(--green)">'+sugestao+' un.</td>'+
+    '</tr>'
+  }).join('')
+}
+
+function imprimirListaCompras(){
+  var baixos=prods.filter(function(p){return p.estoque<=p.estoque_minimo})
+  if(!baixos.length){toast('Nenhum produto com estoque baixo',1);return}
+  var loja=localStorage.getItem('nome_loja')||'CONVENFACIL'
+  var now=new Date()
+  var dt=now.toLocaleDateString('pt-BR')+' '+now.toLocaleTimeString('pt-BR')
+  var linhas=baixos.map(function(p){
+    var sugestao=Math.max((p.estoque_minimo*2)-p.estoque,p.estoque_minimo)
+    return'<tr><td style="padding:6px 8px;border-bottom:1px solid #ddd">'+p.nome+'</td>'+
+      '<td style="padding:6px 8px;border-bottom:1px solid #ddd;text-align:center">'+p.estoque+'</td>'+
+      '<td style="padding:6px 8px;border-bottom:1px solid #ddd;text-align:center;font-weight:700">'+sugestao+'</td>'+
+      '<td style="padding:6px 8px;border-bottom:1px solid #ddd">&nbsp;</td></tr>'
+  }).join('')
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Lista de Compras</title>'+
+    '<style>*{box-sizing:border-box;font-family:Arial,sans-serif}body{padding:20px;color:#000}'+
+    'h1{font-size:20px;margin-bottom:2px}p{font-size:12px;color:#555;margin-bottom:16px}'+
+    'table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;padding:6px 8px;border-bottom:2px solid #000}</style>'+
+    '</head><body>'+
+    '<h1>'+loja+' — Lista de Compras</h1>'+
+    '<p>Gerado em '+dt+'</p>'+
+    '<table><thead><tr><th>Produto</th><th style="text-align:center">Estoque atual</th><th style="text-align:center">Comprar</th><th>Comprado?</th></tr></thead>'+
+    '<tbody>'+linhas+'</tbody></table>'+
+    '</body></html>'
+  var w=window.open('','_blank')
+  w.document.write(html)
+  w.document.close()
+  setTimeout(function(){w.print()},400)
 }
 
 async function restock(id){
