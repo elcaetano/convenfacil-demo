@@ -1019,7 +1019,7 @@ tr:hover td{background:var(--bg2)}
       </div>
     </div>
     <div class="modal-ft" style="justify-content:center;gap:10px">
-      <button class="btn" onclick="closeModals();document.getElementById('ov-resumo').classList.add('open')">&#x2190; Voltar</button>
+      <button class="btn" onclick="voltarPagamento()">&#x2190; Voltar</button>
       <button class="btn grn" id="btn-confirmar-troco" onclick="confirmarTroco()" style="font-size:15px;padding:10px 24px">&#x2713; Confirmar pagamento</button>
     </div>
   </div>
@@ -1178,11 +1178,19 @@ tr:hover td{background:var(--bg2)}
 
 <!-- MODAL ADICIONAR ITEM NA COMANDA -->
 <div class="ov" id="ov-add-item-comanda">
-  <div class="modal" style="max-width:520px;max-height:88vh;overflow-y:auto">
-    <h2>&#x2795; Adicionar item</h2>
-    <input class="search-input" type="text" id="aic-busca" placeholder="Buscar produto..." oninput="filtrarAddItemComanda()" style="margin-bottom:10px">
-    <div id="aic-lista"></div>
-    <div class="modal-ft"><button class="btn" onclick="closeModals()">Fechar</button></div>
+  <div class="modal resumo-modal" style="width:640px">
+    <div style="flex-shrink:0">
+      <h2>&#x2795; Adicionar item</h2>
+      <input class="search-input" type="text" id="aic-busca" placeholder="Buscar produto..." oninput="filtrarAddItemComanda()" style="margin-bottom:10px">
+    </div>
+    <div class="resumo-flex">
+      <div id="aic-lista" class="resumo-itens-col"></div>
+      <div class="resumo-pay-col">
+        <div style="flex:1;color:var(--txt3);font-size:12px;text-align:center;display:flex;align-items:center;justify-content:center;padding:10px">Ajuste as quantidades na lista ao lado e confirme</div>
+        <button class="btn acc" style="width:100%;justify-content:center;margin-bottom:8px" onclick="confirmarAddItensComanda()">Adicionar ao pedido</button>
+        <button class="btn" style="width:100%;justify-content:center" onclick="closeModals()">Fechar</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1194,10 +1202,10 @@ tr:hover td{background:var(--bg2)}
     <div style="font-size:26px;font-weight:800;color:var(--green);margin:10px 0" id="fc-total">R$ 0,00</div>
     <div style="font-size:12px;color:var(--txt3);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin:10px 0">Forma de pagamento</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
-      <button class="pay-btn" onclick="fecharComandaComPagamento('Dinheiro')"><span class="pay-ic">&#x1F4B5;</span>Dinheiro</button>
-      <button class="pay-btn" onclick="fecharComandaComPagamento('Cartao')"><span class="pay-ic">&#x1F4B3;</span>Cartao</button>
-      <button class="pay-btn" onclick="fecharComandaComPagamento('PIX')"><span class="pay-ic">&#x1F4F1;</span>PIX</button>
-      <button class="pay-btn" onclick="fecharComandaComPagamento('Fiado')"><span class="pay-ic">&#x1F4D3;</span>Fiado</button>
+      <button class="pay-btn" onclick="mesaPagamentoAtivo=true;abrirTroco()"><span class="pay-ic">&#x1F4B5;</span>Dinheiro</button>
+      <button class="pay-btn" onclick="mesaPagamentoAtivo=true;closeModals();confirmarPay('Cartao')"><span class="pay-ic">&#x1F4B3;</span>Cartao</button>
+      <button class="pay-btn" onclick="mesaPagamentoAtivo=true;closeModals();abrirPIX()"><span class="pay-ic">&#x1F4F1;</span>PIX</button>
+      <button class="pay-btn" onclick="mesaPagamentoAtivo=true;closeModals();confirmarPay('Fiado')"><span class="pay-ic">&#x1F4D3;</span>Fiado</button>
     </div>
     <button class="btn" style="width:100%;justify-content:center" onclick="closeModals()">&#x2190; Voltar</button>
   </div>
@@ -1251,6 +1259,28 @@ function imprimirViaIframe(html){
     // seguranca: se o navegador nao disparar onafterprint, remove sozinho depois de um tempo
     setTimeout(limpar,15000)
   },350)
+}
+
+// Recibos para o cliente: mesmo esquema do cartaz A4 — abre uma janela de verdade com
+// preview visivel + barra "Imprimir agora"/"Fechar", pra quem esta no caixa decidir se imprime.
+// Nao dispara .print() sozinho (diferente do imprimirViaIframe, que e so pra cupom de cozinha/relatorios).
+function imprimirComPreview(html,tituloBarra){
+  var toolbar='<div class="no-print" style="position:fixed;top:0;left:0;right:0;background:#222;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;z-index:999">'+
+    '<span style="color:#fff;font-size:13px;font-weight:600">&#x1F5A8; '+(tituloBarra||'Pronto para impressao')+'</span>'+
+    '<div style="display:flex;gap:8px">'+
+      '<button onclick="window.print()" style="padding:8px 20px;background:#3ecf8e;color:#000;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer">&#x2705; Imprimir agora</button>'+
+      '<button onclick="window.close()" style="padding:8px 16px;background:#555;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer">Fechar</button>'+
+    '</div>'+
+  '</div><div style="height:46px" class="no-print"></div>'
+  var htmlComToolbar=html
+    .replace('<style>','<style>@media print{.no-print{display:none!important}}')
+    .replace(/<body>/,'<body>'+toolbar)
+  if(htmlComToolbar.indexOf('onafterprint')===-1){
+    htmlComToolbar=htmlComToolbar.replace('</body>','<script>window.onafterprint=function(){window.close()}<\/script></body>')
+  }
+  var w=window.open('','_blank','width=420,height=720')
+  w.document.write(htmlComToolbar)
+  w.document.close()
 }
 
 // Registra uma excecao tanto na tela (memoria) quanto no banco (persistente, para o admin ver depois)
@@ -1419,6 +1449,7 @@ function toggleGrp(id){
 
 function go(id,el){
   if(id!=='comanda'&&comandaTimerInterval){clearInterval(comandaTimerInterval);comandaTimerInterval=null}
+  if(id!=='comanda')mesaPagamentoAtivo=false
   document.querySelectorAll('.sec').forEach(function(s){s.classList.remove('on')})
   document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('on')})
   var sec=document.getElementById('sec-'+id)
@@ -1578,7 +1609,7 @@ function finalizarVenda(){
 }
 
 function confirmarPay(metodo){
-  if(!cart.length){toast('Adicione produtos ao pedido',1);return}
+  if(!mesaPagamentoAtivo && !cart.length){toast('Adicione produtos ao pedido',1);return}
   // Cartao: perguntar debito ou credito
   if(metodo==='Cartao'){
     document.getElementById('ov-cartao').classList.add('open')
@@ -1597,6 +1628,12 @@ function confirmarPay(metodo){
 
 function abrirConfirmar(metodo){
   payMetodo=metodo
+  // Fechamento de mesa reaproveita os mesmos modais de pagamento, mas o encerramento
+  // e outro (comandas/mesas, nao vendas) — nunca passa pelo NF/CPF/pay() do PDV.
+  if(mesaPagamentoAtivo){
+    finalizarFechamentoComanda(metodo)
+    return
+  }
   var total=cart.reduce(function(a,c){return a+Number(c.preco_final)*c.qty},0)
   var ics={Dinheiro:'&#x1F4B5;','Cartao Debito':'&#x1F4B3;','Cartao Credito':'&#x1F4B3;',PIX:'&#x1F4F1;',Fiado:'&#x1F4D3;'}
   document.getElementById('conf-ic').innerHTML=ics[metodo]||'&#x1F4B0;'
@@ -1604,6 +1641,12 @@ function abrirConfirmar(metodo){
   document.getElementById('conf-total').textContent='R$ '+total.toFixed(2)
   document.getElementById('conf-metodo').textContent=metodo
   document.getElementById('ov-confirmar').classList.add('open')
+}
+
+function voltarPagamento(){
+  closeModals()
+  if(mesaPagamentoAtivo){ document.getElementById('ov-fechar-comanda').classList.add('open') }
+  else{ document.getElementById('ov-resumo').classList.add('open') }
 }
 
 async function carregarClientesFiado(){
@@ -1714,7 +1757,8 @@ async function pay(metodo,cpf,imprimirRecibo){
     if(p){var ne=p.estoque-c.qty;await db.from('produtos').update({estoque:ne}).eq('id',c.id);p.estoque=ne}
   }
   // Fiado: lancar automaticamente em Contas a Receber, vinculado ao cliente e com a data prometida
-  if(metodo==='Fiado'&&payClienteFiado){
+  // (metodo vem como "Fiado - Nome do cliente", por isso o indexOf em vez de igualdade exata)
+  if(metodo.indexOf('Fiado')===0&&payClienteFiado){
     await db.from('contas_receber').insert({
       descricao:'Fiado - '+payClienteFiado.nome,
       cliente_nome:payClienteFiado.nome,
@@ -1769,7 +1813,7 @@ function imprimirReciboComCPF(cpf,metodo,total){
     '<div class="c" style="font-size:10px;margin-top:6px">'+rodape+'</div>'+
     '<div class="c" style="font-size:10px">ConvenFacil - convenfacil.com.br</div>'+
     '<br><br></body></html>'
-  imprimirViaIframe(html)
+  imprimirComPreview(html,'Recibo pronto para impressao')
 }
 
 function clearCart(){
@@ -3035,7 +3079,7 @@ function validarCPF(input){
 
 // TROCO
 function abrirTroco(){
-  var total = cart.reduce(function(a,c){ return a + Number(c.preco_final)*c.qty }, 0)
+  var total = totalParaPagamento()
   document.getElementById('troco-total-display').textContent = 'R$ ' + total.toFixed(2)
   document.getElementById('troco-valor-modal').value = ''
   document.getElementById('troco-resultado-wrap').style.display = 'none'
@@ -3046,7 +3090,7 @@ function abrirTroco(){
 }
 
 function calcTrocoModal(){
-  var total = cart.reduce(function(a,c){ return a + Number(c.preco_final)*c.qty }, 0)
+  var total = totalParaPagamento()
   var recebido = parseFloat(document.getElementById('troco-valor-modal').value) || 0
   var troco = recebido - total
   var wrapEl = document.getElementById('troco-resultado-wrap')
@@ -3069,7 +3113,7 @@ function calcTrocoModal(){
 }
 
 function confirmarTroco(){
-  var total = cart.reduce(function(a,c){ return a + Number(c.preco_final)*c.qty }, 0)
+  var total = totalParaPagamento()
   var recebido = parseFloat(document.getElementById('troco-valor-modal').value) || 0
   if(recebido < total){ toast('Valor insuficiente!', 1); return }
   closeModals()
@@ -3160,8 +3204,8 @@ function pararCameraModal(){
 
 // PIX QR CODE
 function abrirPIX(){
-  if(!cart.length){ toast('Adicione produtos ao pedido', 1); return }
-  var total = cart.reduce(function(a,c){ return a + Number(c.preco_final)*c.qty }, 0)
+  if(!mesaPagamentoAtivo && !cart.length){ toast('Adicione produtos ao pedido', 1); return }
+  var total = totalParaPagamento()
   document.getElementById('pix-total').textContent = 'R$ ' + total.toFixed(2)
   // Chave PIX salva no localStorage
   var chavePix = localStorage.getItem('chave_pix') || 'convenfacil@NinjAI'
@@ -3266,11 +3310,25 @@ function imprimirCupom(){
     '<br><br>'+
     '</body></html>'
 
-  imprimirViaIframe(html)
+  imprimirComPreview(html,'Recibo pronto para impressao')
 }
 
 // ============ ATENDIMENTO POR MESAS (modulo, liga/desliga por cliente) ============
 var mesasCache=[], mesaAtualId=null, comandaAtualId=null, itensComandaCache=[], comandaTimerInterval=null
+// Quando true, os mesmos modais de pagamento do PDV (troco/cartao/PIX/fiado) estao sendo
+// reutilizados para fechar a conta de uma mesa em vez de uma venda de balcao (cart).
+// Sempre volta pra false ao sair da tela da comanda (ver go()) e ao finalizar o fechamento.
+var mesaPagamentoAtivo=false
+
+// Total a cobrar no momento: da comanda da mesa (quando fechando mesa) ou do carrinho (PDV normal).
+// Usado por todos os modais de pagamento reaproveitados (troco, PIX, confirmacao) pra nao
+// precisar duplicar a logica de cada um so por causa da origem do valor.
+function totalParaPagamento(){
+  if(mesaPagamentoAtivo){
+    return itensComandaCache.filter(function(it){return it.status!=='cancelado'}).reduce(function(a,it){return a+Number(it.preco_unit)*it.qtd},0)
+  }
+  return cart.reduce(function(a,c){return a+Number(c.preco_final)*c.qty},0)
+}
 
 async function renderMesas(){
   var res=await db.from('mesas').select('*').order('numero')
@@ -3423,7 +3481,7 @@ function renderAddItemComandaLista(lista){
         '<button onclick="mudarQtyAddItem(\''+p.id+'\',1)">+</button>'+
       '</div>'+
     '</div>'
-  }).join('')+'<div class="modal-ft" style="margin-top:12px"><button class="btn acc" style="width:100%;justify-content:center" onclick="confirmarAddItensComanda()">Adicionar ao pedido</button></div>'
+  }).join('')
 }
 
 function mudarQtyAddItem(produtoId,delta){
@@ -3500,12 +3558,27 @@ function abrirFecharComanda(){
   document.getElementById('ov-fechar-comanda').classList.add('open')
 }
 
-async function fecharComandaComPagamento(metodo){
-  var total=itensComandaCache.filter(function(it){return it.status!=='cancelado'}).reduce(function(a,it){return a+Number(it.preco_unit)*it.qtd},0)
+// Fecha a comanda depois que o mesmo fluxo de pagamento do PDV (troco/cartao/PIX/fiado)
+// foi concluido — chamado por abrirConfirmar() quando mesaPagamentoAtivo esta ligado.
+// Nunca mexe em vendas/itens_venda (isso e so do balcao); fechamento de mesa usa comandas/mesas.
+async function finalizarFechamentoComanda(metodo){
+  var total=totalParaPagamento()
   await db.from('comandas').update({status:'fechada',forma_pagamento:metodo,valor_total:total,fechada_em:new Date().toISOString()}).eq('id',comandaAtualId)
   await db.from('mesas').update({status:'livre',garcom_nome:null,comanda_atual_id:null,aberta_em:null}).eq('id',mesaAtualId)
-  document.getElementById('ov-fechar-comanda').classList.remove('open')
-  if(comandaTimerInterval)clearInterval(comandaTimerInterval)
+  if(metodo.indexOf('Fiado')===0&&payClienteFiado){
+    await db.from('contas_receber').insert({
+      descricao:'Fiado - '+payClienteFiado.nome,
+      cliente_nome:payClienteFiado.nome,
+      cliente_fiado_id:payClienteFiado.id,
+      venda_id:null,
+      valor:total,
+      vencimento:payClienteFiado.dataPromessa
+    })
+    payClienteFiado=null
+  }
+  closeModals()
+  if(comandaTimerInterval){clearInterval(comandaTimerInterval);comandaTimerInterval=null}
+  mesaPagamentoAtivo=false
   toast('Conta fechada! Mesa liberada.')
   imprimirFechamentoComanda(metodo,total)
   go('mesas')
@@ -3532,7 +3605,7 @@ function imprimirFechamentoComanda(metodo,total){
     '<div class="linha"></div><div class="c" style="font-size:10px">'+rodape+'</div>'+
     '<script>window.onafterprint=function(){window.close()}<\/script>'+
     '</body></html>'
-  imprimirViaIframe(html)
+  imprimirComPreview(html,'Recibo da mesa pronto para impressao')
 }
 
 // KDS — painel da cozinha
