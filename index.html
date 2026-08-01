@@ -1099,6 +1099,19 @@ tr:hover td{background:var(--bg2)}
   </div>
 </div>
 
+<!-- MODAL CONFIRMACAO GENERICA (exclusoes etc) -->
+<div class="ov" id="ov-confirm-generico">
+  <div class="modal" style="text-align:center;max-width:380px">
+    <div style="font-size:40px;margin-bottom:10px" id="cg-ic">&#x26A0;</div>
+    <h2 id="cg-titulo">Confirmar exclusao?</h2>
+    <p style="font-size:13px;color:var(--txt2);margin:10px 0 20px;line-height:1.5" id="cg-msg"></p>
+    <div class="modal-ft" style="justify-content:center">
+      <button class="btn" onclick="closeModals()">Cancelar</button>
+      <button class="btn red" id="cg-btn-ok" onclick="_execConfirmDialog()">&#x1F5D1; Excluir</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast ok" id="tst"><span class="tic" id="tic">&#x2713;</span><span id="tst-m">ok</span></div>
 
 <script>
@@ -1109,6 +1122,26 @@ const db=createClient(SURL,SKEY)
 
 let prods=[],cart=[],cartSnapshot=[],catA='Todos',promos=[],userLogado=null,payMetodo=null
 let excecoes=[]
+let _confirmCb=null
+
+// Modal de confirmacao generico (substitui window.confirm)
+function confirmDialog(msg,cb,opts){
+  opts=opts||{}
+  document.getElementById('cg-titulo').textContent=opts.titulo||'Confirmar exclusao?'
+  document.getElementById('cg-msg').textContent=msg
+  document.getElementById('cg-ic').textContent=opts.icone||'⚠️'
+  var btn=document.getElementById('cg-btn-ok')
+  btn.textContent=opts.okLabel||'\u{1F5D1} Excluir'
+  btn.className='btn '+(opts.okClass||'red')
+  _confirmCb=cb
+  document.getElementById('ov-confirm-generico').classList.add('open')
+}
+function _execConfirmDialog(){
+  var cb=_confirmCb
+  _confirmCb=null
+  closeModals()
+  if(cb)cb()
+}
 
 const FUNCIONALIDADES=[
   {key:'pdv',label:'PDV',ic:'&#x1F6D2;'},
@@ -1344,9 +1377,13 @@ function renderCart(){
 function removeCartItem(id){
   var i = cart.findIndex(function(x){ return x.id === id })
   if(i < 0) return
-  if(!confirm('Excluir "'+cart[i].nome+'" do pedido?')) return
-  cart.splice(i, 1)
-  renderCart()
+  var nome = cart[i].nome
+  confirmDialog('Excluir "'+nome+'" do pedido?', function(){
+    var j = cart.findIndex(function(x){ return x.id === id })
+    if(j < 0) return
+    cart.splice(j, 1)
+    renderCart()
+  }, {titulo:'Excluir item?', icone:'🗑️'})
 }
 
 function updTot(){
@@ -1589,10 +1626,11 @@ function renderPromos(){
 }
 
 async function delPromo(id){
-  if(!confirm('Excluir esta promocao?'))return
-  await db.from('promocoes').delete().eq('id',id)
-  promos=promos.filter(function(x){return x.id!==id})
-  renderPromos();renderPDV();toast('Promocao excluida')
+  confirmDialog('Excluir esta promocao?', async function(){
+    await db.from('promocoes').delete().eq('id',id)
+    promos=promos.filter(function(x){return x.id!==id})
+    renderPromos();renderPDV();toast('Promocao excluida')
+  })
 }
 
 function editPromoCartaz(id){
@@ -1798,10 +1836,11 @@ async function addCategoria(){
 }
 
 async function delCategoria(id){
-  if(!confirm('Excluir esta categoria? Produtos ja cadastrados com ela nao serao alterados.'))return
-  await db.from('categorias').delete().eq('id',id)
-  toast('Categoria excluida')
-  renderCategorias()
+  confirmDialog('Produtos ja cadastrados com ela nao serao alterados.', async function(){
+    await db.from('categorias').delete().eq('id',id)
+    toast('Categoria excluida')
+    renderCategorias()
+  }, {titulo:'Excluir esta categoria?'})
 }
 
 async function renderHistoricoReposicao(){
@@ -1907,10 +1946,11 @@ async function pagarConta(id){
 }
 
 async function excluirConta(id,tipo){
-  if(!confirm('Excluir esta conta?'))return
-  await db.from('contas_'+tipo).delete().eq('id',id)
-  if(tipo==='pagar')renderContasPagar();else renderContasReceber()
-  toast('Conta excluida')
+  confirmDialog('Excluir esta conta?', async function(){
+    await db.from('contas_'+tipo).delete().eq('id',id)
+    if(tipo==='pagar')renderContasPagar();else renderContasReceber()
+    toast('Conta excluida')
+  })
 }
 
 function printRelPagar(periodo){
@@ -2088,12 +2128,14 @@ function editProd(id){
 async function delProd(id){
   if(!perm('excluir')){toast('Sem permissao para excluir',1);return}
   var p=prods.find(function(x){return x.id===id})
-  if(!p||!confirm('Excluir "'+p.nome+'"?'))return
-  await db.from('produtos').delete().eq('id',id)
-  // Registrar excecao
-  excecoes.unshift({dt:new Date().toLocaleString('pt-BR'),user:userLogado.nome,acao:'EXCLUSAO DE PRODUTO',detalhe:p.nome+' - R$ '+Number(p.preco_venda).toFixed(2)})
-  prods=prods.filter(function(x){return x.id!==id});renderProds();renderPDV();renderCats();updateBadge()
-  toast('Produto excluido')
+  if(!p)return
+  confirmDialog('Excluir "'+p.nome+'"?', async function(){
+    await db.from('produtos').delete().eq('id',id)
+    // Registrar excecao
+    excecoes.unshift({dt:new Date().toLocaleString('pt-BR'),user:userLogado.nome,acao:'EXCLUSAO DE PRODUTO',detalhe:p.nome+' - R$ '+Number(p.preco_venda).toFixed(2)})
+    prods=prods.filter(function(x){return x.id!==id});renderProds();renderPDV();renderCats();updateBadge()
+    toast('Produto excluido')
+  })
 }
 
 // CLIENTES FIADO
@@ -2142,10 +2184,11 @@ function filterClientesFiado(){
 }
 
 async function delClienteFiado(id){
-  if(!confirm('Excluir este cliente?'))return
-  await db.from('clientes_fiado').delete().eq('id',id)
-  renderClientesFiado()
-  toast('Cliente excluido')
+  confirmDialog('Excluir este cliente?', async function(){
+    await db.from('clientes_fiado').delete().eq('id',id)
+    renderClientesFiado()
+    toast('Cliente excluido')
+  })
 }
 
 async function addClienteFiado(){
@@ -2841,15 +2884,18 @@ function abrirResumoPedido(){
 function delResumoItem(id){
   var i = cart.findIndex(function(x){ return x.id === id })
   if(i < 0) return
-  if(!confirm('Excluir "'+cart[i].nome+'" do pedido?')) return
-  cart.splice(i, 1)
-  renderCart()
-  if(!cart.length){
-    closeModals()
-    toast('Pedido esvaziado', 1)
-    return
-  }
-  abrirResumoPedido()
+  var nome = cart[i].nome
+  confirmDialog('Excluir "'+nome+'" do pedido?', function(){
+    var j = cart.findIndex(function(x){ return x.id === id })
+    if(j < 0) return
+    cart.splice(j, 1)
+    renderCart()
+    if(!cart.length){
+      toast('Pedido esvaziado', 1)
+      return
+    }
+    abrirResumoPedido()
+  }, {titulo:'Excluir item?', icone:'🗑️'})
 }
 
 // CAMERA LEITOR
