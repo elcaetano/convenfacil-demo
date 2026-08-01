@@ -1430,6 +1430,7 @@ function iniciarApp(){
   loadProds();loadPromos()
   carregarCategorias().then(preencherSelectCategorias)
   tick();setInterval(tick,30000)
+  go('pdv',document.getElementById('nav-pdv'))
 }
 
 var funcsAtivas={}
