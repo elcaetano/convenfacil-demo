@@ -1628,17 +1628,12 @@ function imprimirReciboComCPF(cpf,metodo,total){
 }
 
 function clearCart(){
-  if(!cart.length){cart=[];renderCart();return}
-  var total=cart.reduce(function(a,c){return a+Number(c.preco_final)*c.qty},0)
-  var itensDesc=cart.map(function(c){return c.qty+'x '+c.nome}).join(', ')
-  confirmDialog(
-    'Este pedido tem R$ '+total.toFixed(2)+' em itens. Isso sera registrado nas Excecoes para o admin conferir. Confirma?',
-    function(){
-      registrarExcecao('PEDIDO LIMPO COM ITENS', itensDesc+' — Total R$ '+total.toFixed(2), total)
-      cart=[];renderCart()
-    },
-    {titulo:'Limpar pedido com itens?', okLabel:'\u{1F5D1} Limpar mesmo assim'}
-  )
+  if(cart.length){
+    var total=cart.reduce(function(a,c){return a+Number(c.preco_final)*c.qty},0)
+    var itensDesc=cart.map(function(c){return c.qty+'x '+c.nome}).join(', ')
+    registrarExcecao('PEDIDO LIMPO COM ITENS', itensDesc+' — Total R$ '+total.toFixed(2), total)
+  }
+  cart=[];renderCart()
 }
 
 // PROMOÇÕES
