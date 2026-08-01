@@ -437,6 +437,7 @@ tr:hover td{background:var(--bg2)}
       <div class="topbar">
         <h1>PDV &mdash; Caixa</h1>
         <div class="topbar-right">
+          <span style="font-size:11px;color:var(--txt3)" title="F2 busca produto | F3 leitor USB | F4 finalizar venda | F6 imprimir cupom">&#x2328; F2 busca &bull; F3 leitor &bull; F4 finalizar &bull; F6 cupom</span>
           <span style="font-size:12px;color:var(--txt3)" id="pdv-info">Carregando...</span>
           <button class="btn sm" onclick="toggleBarcode()" id="btn-barcode" title="Leitor USB de codigo de barras">&#x1F4F0; USB</button>
           <button class="btn sm" onclick="toggleCamera()" id="btn-camera" title="Leitor por camera">&#x1F4F7; Camera</button>
@@ -2605,6 +2606,26 @@ document.addEventListener('click', function(e){
 // Fechar modal com ESC
 document.addEventListener('keydown', function(e){
   if(e.key === 'Escape') closeModals()
+})
+
+// Atalhos de teclado do PDV — so funcionam com a tela de Caixa aberta e nenhum modal em cima.
+// Usei teclas de funcao (F2/F3/F4/F6) de proposito: elas nao digitam nada em campos de texto,
+// entao funcionam mesmo com o cursor no campo de busca ou no leitor de codigo de barras.
+document.addEventListener('keydown', function(e){
+  var secPdv=document.getElementById('sec-pdv')
+  var pdvAtivo=secPdv&&secPdv.classList.contains('on')
+  if(!pdvAtivo||!userLogado||document.querySelector('.ov.open'))return
+  if(e.key==='F2'){
+    e.preventDefault()
+    var s=document.getElementById('srch')
+    if(s){s.focus();s.select()}
+  } else if(e.key==='F3'){
+    e.preventDefault();toggleBarcode()
+  } else if(e.key==='F4'){
+    e.preventDefault();abrirResumoPedido()
+  } else if(e.key==='F6'){
+    e.preventDefault();imprimirCupom()
+  }
 })
 
 async function saveProd(){
