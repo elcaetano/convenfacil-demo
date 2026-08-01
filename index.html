@@ -1733,6 +1733,15 @@ async function carregarCategorias(){
     res=await db.from('categorias').select('*').order('nome')
     lista=res.data||[]
   }
+  // Auto-corrige: garante que toda categoria ja usada em algum produto exista na lista de categorias
+  var nomesExistentes=lista.map(function(c){return c.nome})
+  var usadasEmProdutos=[...new Set(prods.map(function(p){return p.categoria}).filter(Boolean))]
+  var faltando=usadasEmProdutos.filter(function(n){return nomesExistentes.indexOf(n)===-1})
+  if(faltando.length){
+    await db.from('categorias').insert(faltando.map(function(n){return{nome:n}}))
+    res=await db.from('categorias').select('*').order('nome')
+    lista=res.data||[]
+  }
   categoriasCache=lista
   return lista
 }
