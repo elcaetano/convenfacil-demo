@@ -1240,6 +1240,17 @@ const db=createClient(SURL,SKEY)
 let prods=[],cart=[],cartSnapshot=[],catA='Todos',promos=[],userLogado=null,payMetodo=null
 let excecoes=[]
 
+// Multi-tenant: cliente_id do usuario logado, pra nunca uma loja ver dado de outra loja.
+// Master (superadmin) nao tem cliente_id — visao dele fica sem filtro de proposito, pra
+// conseguir conferir/testar qualquer loja. Todo mundo com cliente_id fica travado no proprio.
+function meuCid(){ return (userLogado&&userLogado.cliente_id)||null }
+function scopeCid(q){
+  if(userLogado&&userLogado.nivel!=='superadmin'&&userLogado.cliente_id){
+    return q.eq('cliente_id',userLogado.cliente_id)
+  }
+  return q
+}
+
 // Imprime um HTML sem abrir uma janela separada que fica flutuando/sobrepondo a tela.
 // Usa um iframe escondido: so aparece mesmo a caixinha nativa de impressao do navegador.
 function imprimirViaIframe(html){
@@ -1295,12 +1306,12 @@ async function registrarExcecao(acao,detalhe,valor,itens){
   excecoes.unshift({dt:new Date().toLocaleString('pt-BR'),user:nomeUser,acao:acao,detalhe:detalhe,itens:itens||null})
   if(document.getElementById('sec-excecoes'))renderExceções()
   try{
-    await db.from('excecoes').insert({usuario_nome:nomeUser,acao:acao,detalhe:detalhe,valor:valor||null,itens:itens||null})
+    await db.from('excecoes').insert({usuario_nome:nomeUser,acao:acao,detalhe:detalhe,valor:valor||null,itens:itens||null,cliente_id:meuCid()})
   }catch(e){ /* nao bloquear o fluxo do usuario se o insert falhar */ }
 }
 
 async function carregarExcecoes(){
-  var res=await db.from('excecoes').select('*').order('criado_em',{ascending:false}).limit(200)
+  var res=await scopeCid(db.from('excecoes').select('*')).order('criado_em',{ascending:false}).limit(200)
   if(res.data){
     excecoes=res.data.map(function(e){
       return{dt:new Date(e.criado_em).toLocaleString('pt-BR'),user:e.usuario_nome||'Desconhecido',acao:e.acao,detalhe:e.detalhe,itens:e.itens||null}
@@ -1504,14 +1515,14 @@ function barcodeEnter(e){
 
 // PRODUTOS
 async function loadProds(){
-  var res=await db.from('produtos').select('*').order('nome')
+  var res=await scopeCid(db.from('produtos').select('*')).order('nome')
   prods=res.data||[]
   renderCats();renderPDV();updateBadge()
   document.getElementById('pdv-info').textContent=prods.length+' produtos'
 }
 
 async function loadPromos(){
-  var res=await db.from('promocoes').select('*')
+  var res=await scopeCid(db.from('promocoes').select('*'))
   promos=res.data||[]
 }
 
@@ -1662,7 +1673,7 @@ function voltarPagamento(){
 }
 
 async function carregarClientesFiado(){
-  var res=await db.from('clientes_fiado').select('*').order('nome')
+  var res=await scopeCid(db.from('clientes_fiado').select('*')).order('nome')
   var lista=res.data||[]
   var sel=document.getElementById('fiado-cliente-sel')
   sel.innerHTML='<option value="">-- Selecione ou cadastre --</option>'+lista.map(function(c){
@@ -1757,11 +1768,11 @@ function confirmarVenda(){
 async function pay(metodo,cpf,imprimirRecibo){
   if(!cart.length){toast('Adicione produtos',1);return}
   var total=cart.reduce(function(a,c){return a+Number(c.preco_final)*c.qty},0)
-  var res=await db.from('vendas').insert({total:total,forma_pagamento:metodo}).select().single()
+  var res=await db.from('vendas').insert({total:total,forma_pagamento:metodo,cliente_id:meuCid()}).select().single()
   if(res.error){toast('Erro ao registrar venda',1);return}
   var venda=res.data
   await db.from('itens_venda').insert(cart.map(function(c){
-    return{venda_id:venda.id,produto_id:c.id,quantidade:c.qty,preco_unitario:Number(c.preco_final)}
+    return{venda_id:venda.id,produto_id:c.id,quantidade:c.qty,preco_unitario:Number(c.preco_final),cliente_id:meuCid()}
   }))
   for(var i=0;i<cart.length;i++){
     var c=cart[i]
@@ -1777,7 +1788,8 @@ async function pay(metodo,cpf,imprimirRecibo){
       cliente_fiado_id:payClienteFiado.id,
       venda_id:venda.id,
       valor:total,
-      vencimento:payClienteFiado.dataPromessa
+      vencimento:payClienteFiado.dataPromessa,
+      cliente_id:meuCid()
     })
     payClienteFiado=null
   }
@@ -2013,7 +2025,7 @@ async function restock(id){
   if(qtd>0){
     var ne=p.estoque+qtd
     await db.from('produtos').update({estoque:ne}).eq('id',id)
-    await db.from('reposicoes_estoque').insert({produto_id:id,produto_nome:p.nome,quantidade:qtd})
+    await db.from('reposicoes_estoque').insert({produto_id:id,produto_nome:p.nome,quantidade:qtd,cliente_id:meuCid()})
     p.estoque=ne;renderEstoque();renderPDV();updateBadge()
     toast('+'+qtd+' unidades!')
   }
@@ -2023,11 +2035,11 @@ var CATEGORIAS_PADRAO=['Bebidas','Energeticos','Snacks e Salgadinhos','Chocolate
 var categoriasCache=[]
 
 async function carregarCategorias(){
-  var res=await db.from('categorias').select('*').order('nome')
+  var res=await scopeCid(db.from('categorias').select('*')).order('nome')
   var lista=res.data||[]
   if(!lista.length){
-    await db.from('categorias').insert(CATEGORIAS_PADRAO.map(function(n){return{nome:n}}))
-    res=await db.from('categorias').select('*').order('nome')
+    await db.from('categorias').insert(CATEGORIAS_PADRAO.map(function(n){return{nome:n,cliente_id:meuCid()}}))
+    res=await scopeCid(db.from('categorias').select('*')).order('nome')
     lista=res.data||[]
   }
   // Auto-corrige: garante que toda categoria ja usada em algum produto exista na lista de categorias
@@ -2035,8 +2047,8 @@ async function carregarCategorias(){
   var usadasEmProdutos=[...new Set(prods.map(function(p){return p.categoria}).filter(Boolean))]
   var faltando=usadasEmProdutos.filter(function(n){return nomesExistentes.indexOf(n)===-1})
   if(faltando.length){
-    await db.from('categorias').insert(faltando.map(function(n){return{nome:n}}))
-    res=await db.from('categorias').select('*').order('nome')
+    await db.from('categorias').insert(faltando.map(function(n){return{nome:n,cliente_id:meuCid()}}))
+    res=await scopeCid(db.from('categorias').select('*')).order('nome')
     lista=res.data||[]
   }
   categoriasCache=lista
@@ -2077,7 +2089,7 @@ async function confirmarCategoriaRapida(){
     toast('Categoria ja existia, selecionada')
     return
   }
-  var res=await db.from('categorias').insert({nome:nome})
+  var res=await db.from('categorias').insert({nome:nome,cliente_id:meuCid()})
   if(res.error){toast('Erro ao cadastrar categoria',1);return}
   await carregarCategorias()
   preencherSelectCategorias()
@@ -2089,7 +2101,7 @@ async function confirmarCategoriaRapida(){
 async function addCategoria(){
   var nome=document.getElementById('cat-nova-nome').value.trim()
   if(!nome){toast('Informe o nome da categoria',1);return}
-  var res=await db.from('categorias').insert({nome:nome})
+  var res=await db.from('categorias').insert({nome:nome,cliente_id:meuCid()})
   if(res.error){toast('Erro ao cadastrar categoria',1);return}
   document.getElementById('cat-nova-nome').value=''
   toast('Categoria cadastrada!')
@@ -2106,7 +2118,7 @@ async function delCategoria(id){
 
 async function renderHistoricoReposicao(){
   var tb=document.getElementById('hr-tb')
-  var res=await db.from('reposicoes_estoque').select('*').order('criado_em',{ascending:false}).limit(200)
+  var res=await scopeCid(db.from('reposicoes_estoque').select('*')).order('criado_em',{ascending:false}).limit(200)
   var lista=res.data||[]
   if(!lista.length){tb.innerHTML='<tr><td colspan="3"><div class="empty">Nenhuma reposicao registrada ainda</div></td></tr>';return}
   tb.innerHTML=lista.map(function(r){
@@ -2128,9 +2140,9 @@ function updateBadge(){
 // FINANCEIRO
 async function renderFin(){
   var results=await Promise.all([
-    db.from('vendas').select('*').order('criado_em',{ascending:false}),
-    db.from('contas_pagar').select('valor').eq('pago',false),
-    db.from('contas_receber').select('valor').eq('recebido',false)
+    scopeCid(db.from('vendas').select('*')).order('criado_em',{ascending:false}),
+    scopeCid(db.from('contas_pagar').select('valor')).eq('pago',false),
+    scopeCid(db.from('contas_receber').select('valor')).eq('recebido',false)
   ])
   var vendas=results[0].data||[]
   var totalCP=(results[1].data||[]).reduce(function(a,c){return a+Number(c.valor)},0)
@@ -2165,7 +2177,7 @@ async function renderFin(){
 
 // CONTAS A PAGAR
 async function renderContasPagar(){
-  var res=await db.from('contas_pagar').select('*').order('vencimento')
+  var res=await scopeCid(db.from('contas_pagar').select('*')).order('vencimento')
   var contas=res.data||[]
   var hoje=new Date().toISOString().slice(0,10)
   var mes=hoje.slice(0,7)
@@ -2228,7 +2240,7 @@ function printRelPagar(periodo){
 
 // CONTAS A RECEBER
 async function renderContasReceber(){
-  var res=await db.from('contas_receber').select('*').order('vencimento')
+  var res=await scopeCid(db.from('contas_receber').select('*')).order('vencimento')
   var contas=res.data||[]
   var hoje=new Date().toISOString().slice(0,10)
   var mes=hoje.slice(0,7)
@@ -2242,7 +2254,7 @@ async function renderContasReceber(){
   document.getElementById('cr-recebido').textContent='R$ '+recebidas.reduce(function(a,c){return a+Number(c.valor)},0).toFixed(2)
   document.getElementById('cr-recebido-count').textContent=recebidas.length+' recebidos'
   // Fiados do dia
-  var fiadosDia=await db.from('vendas').select('*').eq('forma_pagamento','Fiado').gte('criado_em',hoje)
+  var fiadosDia=await scopeCid(db.from('vendas').select('*')).eq('forma_pagamento','Fiado').gte('criado_em',hoje)
   var fd=fiadosDia.data||[]
   var fdEl=document.getElementById('fiados-dia')
   if(!fd.length){fdEl.innerHTML='<div class="empty" style="padding:12px 0">Nenhum fiado hoje</div>'}
@@ -2287,7 +2299,7 @@ async function renderRelatorio(){
   var el=document.getElementById('rel-content')
   el.innerHTML='<div class="loading"><div class="spin"></div>Carregando...</div>'
   if(tipo==='vendas'){
-    var res=await db.from('vendas').select('*').gte('criado_em',dataInicio).order('criado_em',{ascending:false})
+    var res=await scopeCid(db.from('vendas').select('*')).gte('criado_em',dataInicio).order('criado_em',{ascending:false})
     var vendas=res.data||[]
     var total=vendas.reduce(function(a,v){return a+Number(v.total)},0)
     el.innerHTML='<div class="mc b" style="margin-bottom:16px"><div class="lbl">Total do periodo</div><div class="val">R$ '+total.toFixed(2)+'</div><div class="sub">'+vendas.length+' vendas</div></div>'+
@@ -2295,7 +2307,7 @@ async function renderRelatorio(){
       (vendas.length?vendas.map(function(v){return'<tr><td>'+new Date(v.criado_em).toLocaleString('pt-BR')+'</td><td>'+v.forma_pagamento+'</td><td style="color:var(--green);font-weight:600">R$ '+Number(v.total).toFixed(2)+'</td></tr>'}).join(''):'<tr><td colspan="3"><div class="empty">Nenhuma venda</div></td></tr>')+
       '</tbody></table></div>'
   } else if(tipo==='pix'){
-    var res=await db.from('vendas').select('*').eq('forma_pagamento','PIX').gte('criado_em',dataInicio).order('criado_em',{ascending:false})
+    var res=await scopeCid(db.from('vendas').select('*')).eq('forma_pagamento','PIX').gte('criado_em',dataInicio).order('criado_em',{ascending:false})
     var vendas=res.data||[]
     var total=vendas.reduce(function(a,v){return a+Number(v.total)},0)
     el.innerHTML='<div class="mc b" style="margin-bottom:16px"><div class="lbl">Total PIX no periodo</div><div class="val">R$ '+total.toFixed(2)+'</div><div class="sub">'+vendas.length+' transacoes PIX</div></div>'+
@@ -2303,7 +2315,7 @@ async function renderRelatorio(){
       (vendas.length?vendas.map(function(v){return'<tr><td>'+new Date(v.criado_em).toLocaleString('pt-BR')+'</td><td style="color:var(--green);font-weight:600">R$ '+Number(v.total).toFixed(2)+'</td></tr>'}).join(''):'<tr><td colspan="2"><div class="empty">Nenhuma transacao PIX</div></td></tr>')+
       '</tbody></table></div>'
   } else if(tipo==='pagar'){
-    var res=await db.from('contas_pagar').select('*').gte('vencimento',dataInicio).order('vencimento')
+    var res=await scopeCid(db.from('contas_pagar').select('*')).gte('vencimento',dataInicio).order('vencimento')
     var contas=res.data||[]
     var total=contas.reduce(function(a,c){return a+Number(c.valor)},0)
     el.innerHTML='<div class="mc r" style="margin-bottom:16px"><div class="lbl">Total a pagar no periodo</div><div class="val">R$ '+total.toFixed(2)+'</div><div class="sub">'+contas.length+' contas</div></div>'+
@@ -2416,9 +2428,9 @@ async function delProd(id){
 var clientesFiadoCache=[]
 
 async function renderClientesFiado(){
-  var res=await db.from('clientes_fiado').select('*').order('nome')
+  var res=await scopeCid(db.from('clientes_fiado').select('*')).order('nome')
   var lista=res.data||[]
-  var cr=await db.from('contas_receber').select('cliente_fiado_id,valor').eq('recebido',false)
+  var cr=await scopeCid(db.from('contas_receber').select('cliente_fiado_id,valor')).eq('recebido',false)
   var saldos={}
   ;(cr.data||[]).forEach(function(c){
     if(!c.cliente_fiado_id)return
@@ -2474,7 +2486,7 @@ async function addClienteFiado(){
   var num=document.getElementById('ncf-num').value.trim()
   var obs=document.getElementById('ncf-obs').value.trim()
   if(!nome){toast('Informe o nome',1);return}
-  var res=await db.from('clientes_fiado').insert({nome:nome,telefone:tel,cpf:cpf,cep:cep,endereco:end,numero:num,observacao:obs})
+  var res=await db.from('clientes_fiado').insert({nome:nome,telefone:tel,cpf:cpf,cep:cep,endereco:end,numero:num,observacao:obs,cliente_id:meuCid()})
   if(res.error){toast('Erro ao cadastrar cliente',1);return}
   closeModals()
   renderClientesFiado()
@@ -2486,7 +2498,7 @@ async function addClienteFiado(){
 // USUARIOS
 var usersCache=[]
 async function renderUsers(){
-  var res=await db.from('usuarios').select('*').order('nome')
+  var res=await scopeCid(db.from('usuarios').select('*')).order('nome')
   usersCache=res.data||[]
   var tb=document.getElementById('users-tb')
   if(!res.data){tb.innerHTML='<tr><td colspan="5"><div class="empty">Erro</div></td></tr>';return}
@@ -2700,6 +2712,7 @@ async function saveProd(){
     if(idx>=0)prods[idx]=res.data
     toast('Produto atualizado!')
   } else {
+    prod.cliente_id=meuCid()
     var res=await db.from('produtos').insert(prod).select().single()
     if(res.error){toast('Erro ao cadastrar',1);return}
     prods.push(res.data)
@@ -2723,6 +2736,7 @@ async function savePromo(){
     if(idx>=0)promos[idx]=Object.assign({id:id},data)
     toast('Promocao atualizada!')
   } else {
+    data.cliente_id=meuCid()
     var res=await db.from('promocoes').insert(data).select().single()
     if(res.error){toast('Erro',1);return}
     promos.push(res.data)
@@ -2737,7 +2751,7 @@ async function addUser(){
   var senha=document.getElementById('nu-senha').value
   var nivel=document.getElementById('nu-nivel').value
   if(!nome||!email||!senha){toast('Preencha todos os campos',1);return}
-  var res=await db.from('usuarios').insert({nome:nome,email:email,senha:senha,nivel:nivel})
+  var res=await db.from('usuarios').insert({nome:nome,email:email,senha:senha,nivel:nivel,cliente_id:meuCid()})
   if(res.error){toast('Erro ao cadastrar',1);return}
   closeModals();renderUsers();toast('Usuario cadastrado!')
 }
@@ -2749,7 +2763,7 @@ async function addContaPagar(){
   var venc=document.getElementById('ncp-venc').value
   var obs=document.getElementById('ncp-obs').value
   if(!desc||!valor||!venc){toast('Preencha todos os campos',1);return}
-  var res=await db.from('contas_pagar').insert({descricao:desc,categoria:cat,valor:valor,vencimento:venc,observacao:obs})
+  var res=await db.from('contas_pagar').insert({descricao:desc,categoria:cat,valor:valor,vencimento:venc,observacao:obs,cliente_id:meuCid()})
   if(res.error){toast('Erro',1);return}
   closeModals();renderContasPagar();toast('Conta a pagar cadastrada!')
 }
@@ -2761,7 +2775,7 @@ async function addContaReceber(){
   var venc=document.getElementById('ncr-venc').value
   var obs=document.getElementById('ncr-obs').value
   if(!desc||!cliente||!valor||!venc){toast('Preencha todos os campos',1);return}
-  var res=await db.from('contas_receber').insert({descricao:desc,cliente_nome:cliente,valor:valor,vencimento:venc,observacao:obs})
+  var res=await db.from('contas_receber').insert({descricao:desc,cliente_nome:cliente,valor:valor,vencimento:venc,observacao:obs,cliente_id:meuCid()})
   if(res.error){toast('Erro',1);return}
   closeModals();renderContasReceber();toast('Conta a receber cadastrada!')
 }
@@ -3428,7 +3442,7 @@ function totalParaPagamento(){
 }
 
 async function renderMesas(){
-  var res=await db.from('mesas').select('*').order('numero')
+  var res=await scopeCid(db.from('mesas').select('*')).order('numero')
   mesasCache=res.data||[]
   var grid=document.getElementById('mesas-grid')
   if(!mesasCache.length){grid.innerHTML='<div class="empty">Nenhuma mesa cadastrada ainda. Clique em "+ Nova mesa".</div>';return}
@@ -3472,7 +3486,7 @@ async function confirmarNovaMesa(){
   if(!numero){toast('Informe o numero da mesa',1);return}
   var capacidade=parseInt(document.getElementById('nm-capacidade').value)||4
   var nome=document.getElementById('nm-nome').value.trim()
-  await db.from('mesas').insert({numero:numero,capacidade:capacidade,nome:nome||null,status:'livre'})
+  await db.from('mesas').insert({numero:numero,capacidade:capacidade,nome:nome||null,status:'livre',cliente_id:meuCid()})
   closeModals()
   toast('Mesa criada!')
   renderMesas()
@@ -3499,7 +3513,7 @@ async function confirmarAbrirMesa(){
   var cliente=document.getElementById('am-cliente').value.trim()
   var pessoas=parseInt(document.getElementById('am-pessoas').value)||1
   var obs=document.getElementById('am-obs').value.trim()
-  var res=await db.from('comandas').insert({mesa_id:m.id,mesa_numero:m.numero,cliente_nome:cliente||null,pessoas:pessoas,garcom_abertura:userLogado.nome,observacoes:obs||null,status:'aberta'}).select().single()
+  var res=await db.from('comandas').insert({mesa_id:m.id,mesa_numero:m.numero,cliente_nome:cliente||null,pessoas:pessoas,garcom_abertura:userLogado.nome,observacoes:obs||null,status:'aberta',cliente_id:meuCid()}).select().single()
   var comanda=res.data
   await db.from('mesas').update({status:'ocupada',garcom_nome:userLogado.nome,comanda_atual_id:comanda.id,aberta_em:new Date().toISOString()}).eq('id',m.id)
   closeModals()
@@ -3595,7 +3609,7 @@ async function confirmarAddItensComanda(){
   if(!ids.length){toast('Escolha ao menos um item',1);return}
   var linhas=ids.map(function(pid){
     var p=prods.find(function(x){return x.id===pid})
-    return{comanda_id:comandaAtualId,produto_id:pid,produto_nome:p.nome,qtd:addItemComandaTemp[pid],preco_unit:Number(p.preco_venda),status:'em_preparo',origem:'garcom',lancado_por:userLogado.nome,impresso:false}
+    return{comanda_id:comandaAtualId,produto_id:pid,produto_nome:p.nome,qtd:addItemComandaTemp[pid],preco_unit:Number(p.preco_venda),status:'em_preparo',origem:'garcom',lancado_por:userLogado.nome,impresso:false,cliente_id:meuCid()}
   })
   await db.from('itens_comanda').insert(linhas)
   await db.from('mesas').update({status:'ocupada'}).eq('id',mesaAtualId)
@@ -3708,7 +3722,7 @@ function imprimirFechamentoComanda(metodo,total){
 // KDS — painel da cozinha
 async function renderKds(){
   iniciarRealtimeMesas()
-  var res=await db.from('itens_comanda').select('*').in('status',['em_preparo','pronto']).order('lancado_em')
+  var res=await scopeCid(db.from('itens_comanda').select('*')).in('status',['em_preparo','pronto']).order('lancado_em')
   var itens=res.data||[]
   var grid=document.getElementById('kds-grid')
   if(!itens.length){grid.innerHTML='<div class="empty">Nenhum pedido em producao</div>';return}
