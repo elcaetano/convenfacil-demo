@@ -437,7 +437,7 @@ tr:hover td{background:var(--bg2)}
       <div class="topbar">
         <h1>PDV &mdash; Caixa</h1>
         <div class="topbar-right">
-          <span style="font-size:11px;color:var(--txt3)" title="F2 busca produto | F3 leitor USB | F4 finalizar venda | F6 imprimir cupom | Ctrl+Delete limpar pedido | F12 chama o PDV de qualquer tela">&#x2328; F2 busca &bull; F3 leitor &bull; F4 finalizar &bull; F6 cupom &bull; Ctrl+Del limpar &bull; F12 volta ao PDV</span>
+          <span style="font-size:11px;color:var(--txt3)" title="F2 busca produto | F3 leitor USB | F4 finalizar venda | F6 imprimir cupom | Ctrl+Delete limpar pedido | F10 chama o PDV de qualquer tela">&#x2328; F2 busca &bull; F3 leitor &bull; F4 finalizar &bull; F6 cupom &bull; Ctrl+Del limpar &bull; F10 volta ao PDV</span>
           <span style="font-size:12px;color:var(--txt3)" id="pdv-info">Carregando...</span>
           <button class="btn sm" onclick="toggleBarcode()" id="btn-barcode" title="Leitor USB de codigo de barras">&#x1F4F0; USB</button>
           <button class="btn sm" onclick="toggleCamera()" id="btn-camera" title="Leitor por camera">&#x1F4F7; Camera</button>
@@ -717,7 +717,7 @@ tr:hover td{background:var(--bg2)}
           <div class="lrow"><span>F4</span><span style="color:var(--txt2)">Abrir Finalizar Venda</span></div>
           <div class="lrow"><span>F6</span><span style="color:var(--txt2)">Imprimir cupom</span></div>
           <div class="lrow"><span>Ctrl + Delete</span><span style="color:var(--txt2)">Limpar pedido (combinacao de proposito, pra nao disparar sem querer)</span></div>
-          <div class="lrow"><span>F12</span><span style="color:var(--txt2)">Chamar o PDV de qualquer tela do sistema</span></div>
+          <div class="lrow"><span>F10</span><span style="color:var(--txt2)">Chamar o PDV de qualquer tela do sistema</span></div>
         </div>
       </div>
     </div>
@@ -2655,12 +2655,12 @@ window.addEventListener('beforeunload', function(e){
   }
 })
 
-// F12 chama o PDV de qualquer tela do sistema (nao so de dentro do PDV, ao contrario
-// dos atalhos F2/F3/F4/F6). Obs: no Chrome o F12 tambem abre o DevTools — isso e do
-// navegador, o app nao tem como bloquear isso, mas o atalho pro PDV funciona igual.
+// F10 chama o PDV de qualquer tela do sistema (nao so de dentro do PDV, ao contrario
+// dos atalhos F2/F3/F4/F6). F10 nao tem acao padrao no navegador, entao nao chama nada alem disso.
 document.addEventListener('keydown', function(e){
-  if(e.key==='F12'){
+  if(e.key==='F10'){
     if(!userLogado||document.querySelector('.ov.open'))return
+    e.preventDefault()
     go('pdv',document.getElementById('nav-pdv'))
   }
 })
