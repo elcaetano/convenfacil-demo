@@ -1234,6 +1234,7 @@ tr:hover td{background:var(--bg2)}
 <script>
 const SURL='https://jkantpfxudbqzrtrctgp.supabase.co'
 const SKEY='sb_publishable_DeHWabj6Oh13qkMB7KzNfQ_5e6ZW9Fm'
+const ADMIN_FN_URL=SURL+'/functions/v1/admin-users'
 const {createClient}=supabase
 const db=createClient(SURL,SKEY)
 
@@ -1366,6 +1367,15 @@ function perm(acao){
 }
 
 // LOGIN
+// Autenticacao real via Supabase Auth (antes era so uma tabela propria com senha em texto puro,
+// o que nao dava pra proteger de verdade com RLS). A tabela usuarios continua existindo, mas so
+// como "perfil" (nome, nivel, cliente_id) — quem confere a senha agora e o Supabase Auth.
+async function carregarPerfilLogado(authUser){
+  const{data,error}=await db.from('usuarios').select('*').eq('id',authUser.id).single()
+  if(error||!data||!data.ativo)return null
+  return data
+}
+
 async function doLogin(){
   const email=document.getElementById('login-email').value.trim()
   const senha=document.getElementById('login-senha').value
@@ -1374,10 +1384,27 @@ async function doLogin(){
   if(!email||!senha){err.textContent='Preencha email e senha';err.style.display='block';return}
   btn.textContent='Entrando...';btn.disabled=true;err.style.display='none'
   try{
-    const {data,error}=await db.from('usuarios').select('*').eq('email',email).eq('senha',senha).eq('ativo',true).single()
-    if(error||!data){err.textContent='Email ou senha incorretos';err.style.display='block';btn.textContent='Entrar no sistema';btn.disabled=false;return}
-    userLogado=data;iniciarApp()
+    const{data:authData,error:authErr}=await db.auth.signInWithPassword({email:email,password:senha})
+    if(authErr||!authData.user){err.textContent='Email ou senha incorretos';err.style.display='block';btn.textContent='Entrar no sistema';btn.disabled=false;return}
+    const perfil=await carregarPerfilLogado(authData.user)
+    if(!perfil){
+      await db.auth.signOut()
+      err.textContent='Usuario inativo ou nao encontrado';err.style.display='block';btn.textContent='Entrar no sistema';btn.disabled=false;return
+    }
+    userLogado=perfil;iniciarApp()
   }catch(e){err.textContent='Erro de conexao';err.style.display='block';btn.textContent='Entrar no sistema';btn.disabled=false}
+}
+
+// Restaura a sessao se a pessoa ja estava logada (Supabase Auth guarda a sessao sozinho) —
+// evita ter que logar de novo toda vez que abre a aba/atualiza a pagina.
+async function restaurarSessao(){
+  try{
+    const{data}=await db.auth.getSession()
+    if(!data||!data.session||!data.session.user)return
+    const perfil=await carregarPerfilLogado(data.session.user)
+    if(!perfil){await db.auth.signOut();return}
+    userLogado=perfil;iniciarApp()
+  }catch(e){}
 }
 
 function iniciarApp(){
@@ -1444,6 +1471,7 @@ function ajustarMenuPorNivel(){
 }
 
 function doLogout(){
+  db.auth.signOut()
   userLogado=null;cart=[]
   document.getElementById('app').classList.remove('on')
   document.getElementById('login-wrap').style.display='flex'
@@ -2527,10 +2555,12 @@ async function delUsuario(id){
   if(!u)return
   if(u.email==='admin@convenfacil.com.br'||(userLogado&&u.id===userLogado.id)){toast('Nao e possivel excluir esse usuario',1);return}
   confirmDialog('Excluir o usuario "'+u.nome+'" ('+u.email+')? Essa acao nao pode ser desfeita.', async function(){
-    await db.from('usuarios').delete().eq('id',id)
-    registrarExcecao('USUARIO EXCLUIDO', u.nome+' ('+u.email+') - nivel '+u.nivel, 0)
-    renderUsers()
-    toast('Usuario excluido')
+    try{
+      await chamarAdminUsers({action:'delete',id:id})
+      registrarExcecao('USUARIO EXCLUIDO', u.nome+' ('+u.email+') - nivel '+u.nivel, 0)
+      renderUsers()
+      toast('Usuario excluido')
+    }catch(e){toast(e.message||'Erro ao excluir',1)}
   }, {titulo:'Excluir usuario?', icone:'👤'})
 }
 
@@ -2745,15 +2775,33 @@ async function savePromo(){
   closeModals();renderPromos();renderPDV()
 }
 
+// Criar/apagar usuario agora passa por uma Edge Function (admin-users), que e a unica
+// peca do sistema com a chave service_role — a pagina (browser) nunca ve essa chave.
+// A funcao confere a sessao de quem esta chamando e so deixa admin/superadmin agir.
+async function chamarAdminUsers(payload){
+  var{data:sess}=await db.auth.getSession()
+  var token=sess&&sess.session&&sess.session.access_token
+  var res=await fetch(ADMIN_FN_URL,{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+(token||'')},
+    body:JSON.stringify(payload)
+  })
+  var out=await res.json().catch(function(){return{}})
+  if(!res.ok||out.error)throw new Error(out.error||'Erro na operacao')
+  return out
+}
+
 async function addUser(){
   var nome=document.getElementById('nu-nome').value.trim()
   var email=document.getElementById('nu-email').value.trim()
   var senha=document.getElementById('nu-senha').value
   var nivel=document.getElementById('nu-nivel').value
   if(!nome||!email||!senha){toast('Preencha todos os campos',1);return}
-  var res=await db.from('usuarios').insert({nome:nome,email:email,senha:senha,nivel:nivel,cliente_id:meuCid()})
-  if(res.error){toast('Erro ao cadastrar',1);return}
-  closeModals();renderUsers();toast('Usuario cadastrado!')
+  if(senha.length<6){toast('Senha precisa ter pelo menos 6 caracteres',1);return}
+  try{
+    await chamarAdminUsers({action:'create',nome:nome,email:email,password:senha,nivel:nivel,cliente_id:meuCid()})
+    closeModals();renderUsers();toast('Usuario cadastrado!')
+  }catch(e){toast(e.message||'Erro ao cadastrar',1)}
 }
 
 async function addContaPagar(){
@@ -3797,6 +3845,7 @@ function toast(msg,err){
 }
 
 loadProds();loadPromos()
+restaurarSessao()
 </script>
 </body>
 </html>
