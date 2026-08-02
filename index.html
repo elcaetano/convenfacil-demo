@@ -1445,7 +1445,10 @@ function iniciarApp(){
   loadProds();loadPromos()
   carregarCategorias().then(preencherSelectCategorias)
   tick();setInterval(tick,30000)
-  go('pdv',document.getElementById('nav-pdv'))
+  // Master nao vende nada, so administra as lojas — entao cai direto no Painel Master.
+  // Todo mundo mais (dono da loja, gerente, operador) cai no PDV, que e o trabalho do dia a dia.
+  if(userLogado.nivel==='superadmin')go('superadmin')
+  else go('pdv',document.getElementById('nav-pdv'))
 }
 
 var funcsAtivas={}
