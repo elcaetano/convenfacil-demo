@@ -964,6 +964,21 @@ tr:hover td{background:var(--bg2)}
   </div>
 </div>
 
+<div class="ov" id="ov-sa-owner">
+  <div class="modal">
+    <h2>&#x1F511; Criar acesso do dono</h2>
+    <p style="font-size:12px;color:var(--txt3);margin-bottom:14px" id="sao-loja-nome">Loja</p>
+    <input type="hidden" id="sao-cliente-id">
+    <div class="fgrid c1"><div class="fg"><label>Nome do dono</label><input type="text" id="sao-nome" placeholder="Ex: Jose da Conveniencia"></div></div>
+    <div class="fgrid c2">
+      <div class="fg"><label>Email de acesso</label><input type="email" id="sao-email" placeholder="jose@email.com"></div>
+      <div class="fg"><label>Senha temporaria</label><input type="text" id="sao-senha" placeholder="Ex: Conven2026!"></div>
+    </div>
+    <p style="font-size:11px;color:var(--txt3);margin-bottom:6px">Essa conta entra como administrador so dessa loja (nao ve as outras lojas nem o Painel Master). Anote a senha e passe pro dono trocar no primeiro acesso.</p>
+    <div class="modal-ft"><button class="btn" onclick="closeModals()">Cancelar</button><button class="btn acc" onclick="confirmarCriarDono()">Criar acesso</button></div>
+  </div>
+</div>
+
 <!-- MODAL RESUMO DO PEDIDO -->
 <div class="ov" id="ov-resumo">
   <div class="modal resumo-modal">
@@ -2611,6 +2626,7 @@ async function renderSuperAdmin(){
         '</div>'+
         '<div style="display:flex;gap:7px;align-items:center">'+
           '<span class="tag '+(c.ativo?'ok':'out')+'">'+(c.ativo?'Ativo':'Inativo')+'</span>'+
+          '<button class="btn sm" onclick="abrirCriarDono(\''+c.id+'\',\''+c.nome.replace(/'/g,"\\'")+'\')" title="Criar login de admin para o dono dessa loja">&#x1F511; Criar acesso do dono</button>'+
           '<button class="btn sm '+(c.ativo?'red':'grn')+'" onclick="toggleCliente(\''+c.id+'\','+c.ativo+')">'+(c.ativo?'Suspender':'Ativar')+'</button>'+
         '</div>'+
       '</div>'+
@@ -2639,6 +2655,31 @@ async function toggleFunc(clienteId,funcKey,valor,funcId){
 async function toggleCliente(id,ativo){
   await db.from('clientes').update({ativo:!ativo}).eq('id',id)
   renderSuperAdmin();toast('Cliente '+(ativo?'suspenso':'ativado'))
+}
+
+// Cria o primeiro login (nivel admin) de uma loja, direto do Painel Master — sem precisar
+// de SQL manual. Essa conta so enxerga a propria loja (RLS), nunca o Painel Master.
+function abrirCriarDono(clienteId,clienteNome){
+  document.getElementById('sao-cliente-id').value=clienteId
+  document.getElementById('sao-loja-nome').textContent='Loja: '+clienteNome
+  document.getElementById('sao-nome').value=''
+  document.getElementById('sao-email').value=''
+  document.getElementById('sao-senha').value=''
+  document.getElementById('ov-sa-owner').classList.add('open')
+}
+
+async function confirmarCriarDono(){
+  var clienteId=document.getElementById('sao-cliente-id').value
+  var nome=document.getElementById('sao-nome').value.trim()
+  var email=document.getElementById('sao-email').value.trim()
+  var senha=document.getElementById('sao-senha').value
+  if(!nome||!email||!senha){toast('Preencha todos os campos',1);return}
+  if(senha.length<6){toast('Senha precisa ter pelo menos 6 caracteres',1);return}
+  try{
+    await chamarAdminUsers({action:'create',nome:nome,email:email,password:senha,nivel:'admin',cliente_id:clienteId})
+    closeModals()
+    toast('Acesso do dono criado! Anote a senha: '+senha)
+  }catch(e){toast(e.message||'Erro ao criar acesso',1)}
 }
 
 // MODAIS
