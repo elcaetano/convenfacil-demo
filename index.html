@@ -3776,7 +3776,8 @@ async function finalizarFechamentoComanda(metodo){
       cliente_fiado_id:payClienteFiado.id,
       venda_id:null,
       valor:total,
-      vencimento:payClienteFiado.dataPromessa
+      vencimento:payClienteFiado.dataPromessa,
+      cliente_id:meuCid()
     })
     payClienteFiado=null
   }
