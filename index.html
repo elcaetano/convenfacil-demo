@@ -2088,7 +2088,7 @@ function imprimirListaCompras(){
     '<table><thead><tr><th>Produto</th><th style="text-align:center">Estoque atual</th><th style="text-align:center">Comprar</th><th>Comprado?</th></tr></thead>'+
     '<tbody>'+linhas+'</tbody></table>'+
     '</body></html>'
-  imprimirViaIframe(html)
+  imprimirComPreview(html,'Lista de compras pronta para impressao')
 }
 
 async function restock(id){
@@ -2426,7 +2426,7 @@ function printRel(){
     '<div class="sub">Gerado em: '+now+'</div>'+
     el.innerHTML+
     '</body></html>'
-  imprimirViaIframe(html)
+  imprimirComPreview(html,'Relatorio pronto para impressao')
 }
 
 // PRODUTOS
@@ -3757,7 +3757,7 @@ async function imprimirItensNovosComanda(){
     '<div class="c" style="font-size:10px">Garcom: '+userLogado.nome+'</div>'+
     '<script>window.onafterprint=function(){window.close()}<\/script>'+
     '</body></html>'
-  imprimirViaIframe(html)
+  imprimirComPreview(html,'Pedido para a cozinha — Mesa '+(m?m.numero:''))
   var idsImpressos=novos.map(function(it){return it.id})
   await db.from('itens_comanda').update({impresso:true}).in('id',idsImpressos)
 }
