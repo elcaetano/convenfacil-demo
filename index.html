@@ -1445,6 +1445,7 @@ function iniciarApp(){
   loadProds();loadPromos()
   carregarCategorias().then(preencherSelectCategorias)
   tick();setInterval(tick,30000)
+  restaurarRascunhoCart()
   // Master nao vende nada, so administra as lojas — entao cai direto no Painel Master.
   // Todo mundo mais (dono da loja, gerente, operador) cai no PDV, que e o trabalho do dia a dia.
   if(userLogado.nivel==='superadmin')go('superadmin')
@@ -1574,7 +1575,8 @@ async function loadPromos(){
 }
 
 function renderCats(){
-  var cats=['Todos'].concat([...new Set(prods.map(function(p){return p.categoria}).filter(Boolean))])
+  var resto=[...new Set(prods.map(function(p){return p.categoria}).filter(Boolean))].sort(function(a,b){return a.localeCompare(b,'pt-BR')})
+  var cats=['Todos'].concat(resto)
   document.getElementById('cat-filter').innerHTML=cats.map(function(c){
     return'<button class="cat-btn '+(c===catA?'on':'')+'" onclick="setcat(\''+c+'\')">'+c+'</button>'
   }).join('')
@@ -1634,7 +1636,7 @@ function renderCart(){
   var cc=document.getElementById('cc')
   var ti=cart.reduce(function(a,c){return a+c.qty},0)
   if(ti>0){cc.textContent=ti;cc.style.display=''}else cc.style.display='none'
-  if(!cart.length){el.innerHTML='<div class="empty">&#x1F6D2; Nenhum item</div>';updTot();return}
+  if(!cart.length){el.innerHTML='<div class="empty">&#x1F6D2; Nenhum item</div>';updTot();salvarRascunhoCart();return}
   el.innerHTML=cart.map(function(c){
     return'<div class="ci">'+
       '<span class="ci-em">'+(c.emoji||'&#x1F4E6;')+'</span>'+
@@ -1649,6 +1651,30 @@ function renderCart(){
     '</div>'
   }).join('')
   updTot()
+  salvarRascunhoCart()
+}
+
+// Guarda o pedido em andamento no proprio navegador (localStorage), pra nao perder tudo se
+// a luz cair, o navegador travar ou a pagina recarregar sozinha no meio de uma venda. Nao e
+// um backup de verdade (fica so nessa maquina), mas resolve o caso mais comum de imprevisto.
+function chaveRascunhoCart(){ return 'cf_cart_draft_'+(meuCid()||'geral') }
+function salvarRascunhoCart(){
+  try{
+    if(cart.length)localStorage.setItem(chaveRascunhoCart(),JSON.stringify(cart))
+    else localStorage.removeItem(chaveRascunhoCart())
+  }catch(e){}
+}
+function restaurarRascunhoCart(){
+  try{
+    var raw=localStorage.getItem(chaveRascunhoCart())
+    if(!raw)return
+    var salvo=JSON.parse(raw)
+    if(Array.isArray(salvo)&&salvo.length){
+      cart=salvo
+      renderCart()
+      toast('Pedido em andamento recuperado (evita perder venda se a luz cair ou a tela travar)')
+    }
+  }catch(e){}
 }
 
 function removeCartItem(id){
