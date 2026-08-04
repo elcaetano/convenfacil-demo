@@ -1229,7 +1229,40 @@ tr:hover td{background:var(--bg2)}
       <button class="pay-btn" onclick="mesaPagamentoAtivo=true;closeModals();abrirPIX()"><span class="pay-ic">&#x1F4F1;</span>PIX</button>
       <button class="pay-btn" onclick="mesaPagamentoAtivo=true;closeModals();confirmarPay('Fiado')"><span class="pay-ic">&#x1F4D3;</span>Fiado</button>
     </div>
+    <button class="btn acc" style="width:100%;justify-content:center;margin-bottom:10px" onclick="abrirDividirConta()">&#x2702; Dividir conta entre varias formas</button>
     <button class="btn" style="width:100%;justify-content:center" onclick="closeModals()">&#x2190; Voltar</button>
+  </div>
+</div>
+
+<!-- MODAL DIVIDIR CONTA -->
+<div class="ov" id="ov-dividir-pagamento">
+  <div class="modal" style="max-width:460px">
+    <div style="font-size:36px;text-align:center;margin-bottom:6px">&#x2702;</div>
+    <h2 style="text-align:center">Dividir a conta</h2>
+    <div style="text-align:center;font-size:22px;font-weight:800;color:var(--green);margin:6px 0" id="dp-total">R$ 0,00</div>
+    <div id="dp-lista" style="margin:10px 0;max-height:180px;overflow-y:auto"></div>
+    <div style="text-align:center;font-size:13px;font-weight:700;margin:8px 0" id="dp-falta">Falta dividir: R$ 0,00</div>
+    <div class="fgrid c2">
+      <div class="fg"><label>Forma</label><select id="dp-metodo" onchange="toggleDpFiado()">
+        <option value="Dinheiro">Dinheiro</option>
+        <option value="Cartao Debito">Cartao Debito</option>
+        <option value="Cartao Credito">Cartao Credito</option>
+        <option value="PIX">PIX</option>
+        <option value="Fiado">Fiado</option>
+      </select></div>
+      <div class="fg"><label>Valor (R$)</label><input type="number" id="dp-valor" placeholder="0,00" step="0.01" min="0"></div>
+    </div>
+    <div id="dp-fiado-campos" style="display:none">
+      <div class="fgrid c2">
+        <div class="fg"><label>Cliente fiado</label><select id="dp-fiado-cliente" style="width:100%"><option value="">-- Selecione --</option></select></div>
+        <div class="fg"><label>Promessa de pagamento</label><input type="date" id="dp-fiado-data" style="width:100%"></div>
+      </div>
+    </div>
+    <button class="btn acc" style="width:100%;justify-content:center;margin:6px 0 14px" onclick="adicionarLinhaDivisao()">&#x2795; Adicionar forma</button>
+    <div class="modal-ft">
+      <button class="btn" onclick="closeModals();document.getElementById('ov-fechar-comanda').classList.add('open')">&#x2190; Voltar</button>
+      <button class="btn grn" id="dp-confirmar-btn" onclick="confirmarDivisaoConta()" disabled>&#x2713; Confirmar e fechar mesa</button>
+    </div>
   </div>
 </div>
 
@@ -3827,6 +3860,160 @@ function abrirFecharComanda(){
   if(!total){toast('Nao ha itens para fechar',1);return}
   document.getElementById('fc-total').textContent='R$ '+total.toFixed(2)
   document.getElementById('ov-fechar-comanda').classList.add('open')
+}
+
+// Dividir conta: permite fechar a mesa com varias formas de pagamento ao mesmo tempo
+// (ex: um paga PIX, outro debito, outro fiado), cada uma com um valor parcial.
+// So disponivel no fechamento de mesa (nao no PDV balcao).
+var divisaoPagamentos=[]
+var divisaoTotal=0
+
+function abrirDividirConta(){
+  closeModals()
+  mesaPagamentoAtivo=true
+  divisaoPagamentos=[]
+  divisaoTotal=totalParaPagamento()
+  document.getElementById('dp-total').textContent='R$ '+divisaoTotal.toFixed(2)
+  document.getElementById('dp-metodo').value='Dinheiro'
+  document.getElementById('dp-valor').value=''
+  toggleDpFiado()
+  renderDivisaoPagamentos()
+  document.getElementById('ov-dividir-pagamento').classList.add('open')
+}
+
+function toggleDpFiado(){
+  var eh=document.getElementById('dp-metodo').value==='Fiado'
+  document.getElementById('dp-fiado-campos').style.display=eh?'block':'none'
+  if(eh)carregarClientesFiadoDp()
+}
+
+async function carregarClientesFiadoDp(){
+  var res=await scopeCid(db.from('clientes_fiado').select('*')).order('nome')
+  var lista=res.data||[]
+  var sel=document.getElementById('dp-fiado-cliente')
+  sel.innerHTML='<option value="">-- Selecione --</option>'+lista.map(function(c){
+    return'<option value="'+c.id+'">'+c.nome+'</option>'
+  }).join('')
+  var venc=new Date();venc.setDate(venc.getDate()+7)
+  document.getElementById('dp-fiado-data').value=venc.toISOString().slice(0,10)
+}
+
+function somaDividido(){
+  return divisaoPagamentos.reduce(function(a,p){return a+p.valor},0)
+}
+
+function adicionarLinhaDivisao(){
+  var metodo=document.getElementById('dp-metodo').value
+  var valor=parseFloat(document.getElementById('dp-valor').value)||0
+  if(valor<=0){toast('Informe um valor valido',1);return}
+  var falta=divisaoTotal-somaDividido()
+  if(valor-falta>0.009){toast('Esse valor passa do que falta (R$ '+falta.toFixed(2)+')',1);return}
+  var linha={metodo:metodo,valor:valor}
+  if(metodo==='Fiado'){
+    var sel=document.getElementById('dp-fiado-cliente')
+    var clienteId=sel.value
+    var clienteNome=sel.options[sel.selectedIndex]?sel.options[sel.selectedIndex].text:''
+    var dataPromessa=document.getElementById('dp-fiado-data').value
+    if(!clienteId){toast('Selecione o cliente do fiado',1);return}
+    if(!dataPromessa){toast('Informe a data prometida',1);return}
+    linha.clienteId=clienteId
+    linha.clienteNome=clienteNome
+    linha.dataPromessa=dataPromessa
+  }
+  divisaoPagamentos.push(linha)
+  document.getElementById('dp-valor').value=''
+  renderDivisaoPagamentos()
+}
+
+function removerLinhaDivisao(idx){
+  divisaoPagamentos.splice(idx,1)
+  renderDivisaoPagamentos()
+}
+
+function renderDivisaoPagamentos(){
+  var ic={Dinheiro:'&#x1F4B5;','Cartao Debito':'&#x1F4B3;','Cartao Credito':'&#x1F4B3;',PIX:'&#x1F4F1;',Fiado:'&#x1F4D3;'}
+  var lista=document.getElementById('dp-lista')
+  lista.innerHTML=divisaoPagamentos.length?divisaoPagamentos.map(function(p,i){
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">'+
+      '<span>'+(ic[p.metodo]||'')+' '+p.metodo+(p.clienteNome?' ('+p.clienteNome+')':'')+'</span>'+
+      '<span style="display:flex;align-items:center;gap:8px"><b>R$ '+p.valor.toFixed(2)+'</b>'+
+      '<button class="btn sm red" onclick="removerLinhaDivisao('+i+')" style="padding:2px 8px">&#x2715;</button></span>'+
+    '</div>'
+  }).join(''):'<div class="empty" style="padding:10px 0">Nenhuma forma adicionada ainda</div>'
+  var falta=divisaoTotal-somaDividido()
+  var faltaEl=document.getElementById('dp-falta')
+  if(falta>0.009){
+    faltaEl.textContent='Falta dividir: R$ '+falta.toFixed(2)
+    faltaEl.style.color='var(--red)'
+  } else if(falta<-0.009){
+    faltaEl.textContent='Passou do total em R$ '+Math.abs(falta).toFixed(2)
+    faltaEl.style.color='var(--red)'
+  } else {
+    faltaEl.textContent='Valores batem certinho!'
+    faltaEl.style.color='var(--green)'
+  }
+  document.getElementById('dp-confirmar-btn').disabled=Math.abs(falta)>0.009||!divisaoPagamentos.length
+}
+
+async function confirmarDivisaoConta(){
+  var falta=divisaoTotal-somaDividido()
+  if(Math.abs(falta)>0.009){toast('Os valores ainda nao batem com o total',1);return}
+  if(!divisaoPagamentos.length){toast('Adicione ao menos uma forma de pagamento',1);return}
+  await finalizarFechamentoComandaDividida(divisaoPagamentos.slice())
+}
+
+async function finalizarFechamentoComandaDividida(pagamentos){
+  var total=totalParaPagamento()
+  var resumo=pagamentos.map(function(p){return p.metodo+(p.clienteNome?' ('+p.clienteNome+')':'')+' R$ '+p.valor.toFixed(2)}).join(' + ')
+  var descricao='Dividido: '+resumo
+  await db.from('comandas').update({status:'fechada',forma_pagamento:descricao,valor_total:total,fechada_em:new Date().toISOString()}).eq('id',comandaAtualId)
+  await db.from('mesas').update({status:'livre',garcom_nome:null,comanda_atual_id:null,aberta_em:null}).eq('id',mesaAtualId)
+  for(var i=0;i<pagamentos.length;i++){
+    var p=pagamentos[i]
+    if(p.metodo==='Fiado'){
+      await db.from('contas_receber').insert({
+        descricao:'Fiado (conta dividida) - '+p.clienteNome,
+        cliente_nome:p.clienteNome,
+        cliente_fiado_id:p.clienteId,
+        venda_id:null,
+        valor:p.valor,
+        vencimento:p.dataPromessa,
+        cliente_id:meuCid()
+      })
+    }
+  }
+  closeModals()
+  if(comandaTimerInterval){clearInterval(comandaTimerInterval);comandaTimerInterval=null}
+  mesaPagamentoAtivo=false
+  toast('Conta dividida e fechada! Mesa liberada.')
+  imprimirFechamentoComandaDividida(pagamentos,total)
+  go('mesas')
+}
+
+function imprimirFechamentoComandaDividida(pagamentos,total){
+  var m=mesasCache.find(function(x){return x.id===mesaAtualId})
+  var loja=localStorage.getItem('nome_loja')||'CONVENFACIL'
+  var rodape=localStorage.getItem('rodape_cupom')||'Obrigado pela preferencia!'
+  var now=new Date()
+  var itensHtml=itensComandaCache.filter(function(it){return it.status!=='cancelado'}).map(function(it){
+    return '<div style="display:flex;justify-content:space-between"><span>'+it.qtd+'x '+it.produto_nome+'</span><span>R$ '+(Number(it.preco_unit)*it.qtd).toFixed(2)+'</span></div>'
+  }).join('')
+  var pagsHtml=pagamentos.map(function(p){
+    return '<div style="display:flex;justify-content:space-between"><span>'+p.metodo+(p.clienteNome?' ('+p.clienteNome+')':'')+'</span><span>R$ '+p.valor.toFixed(2)+'</span></div>'
+  }).join('')
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><style>'+
+    '*{margin:0;padding:0;box-sizing:border-box}body{font-family:"Courier New",monospace;font-size:11px;width:80mm;background:#fff;color:#000;padding:3mm}'+
+    '.c{text-align:center}.b{font-weight:bold}.g{font-size:14px}.linha{border-top:1px dashed #000;margin:4px 0}'+
+    '@media print{body{width:80mm}}</style></head><body>'+
+    '<div class="c b" style="font-size:14px">'+loja+'</div>'+
+    '<div class="c">'+now.toLocaleDateString('pt-BR')+' '+now.toLocaleTimeString('pt-BR')+'</div>'+
+    '<div class="linha"></div><div class="c b">MESA '+(m?m.numero:'')+' — FECHAMENTO (CONTA DIVIDIDA)</div><div class="linha"></div>'+
+    itensHtml+'<div class="linha"></div>'+
+    '<div style="display:flex;justify-content:space-between" class="b g"><span>TOTAL:</span><span>R$ '+total.toFixed(2)+'</span></div>'+
+    '<div class="linha"></div><div class="b" style="margin-bottom:2px">Pagamento dividido:</div>'+pagsHtml+
+    '<div class="linha"></div><div class="c" style="font-size:10px">'+rodape+'</div>'+
+    '</body></html>'
+  imprimirComPreview(html,'Recibo da mesa (conta dividida) pronto para impressao')
 }
 
 // Fecha a comanda depois que o mesmo fluxo de pagamento do PDV (troco/cartao/PIX/fiado)
