@@ -519,6 +519,7 @@ tr:hover td{background:var(--bg2)}
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
           <button class="btn acc" onclick="abrirAddItemComanda()">&#x2795; Adicionar item</button>
+          <button class="btn" onclick="imprimirConferenciaComanda()">&#x1F5A8; Imprimir comanda</button>
           <button class="btn yellow" onclick="pedirContaMesa()">&#x1F9FE; Pedir conta</button>
           <button class="btn grn" onclick="abrirFecharComanda()">&#x2705; Fechar conta</button>
         </div>
@@ -631,6 +632,7 @@ tr:hover td{background:var(--bg2)}
         <div class="rel-filter">
           <select id="rel-tipo" onchange="renderRelatorio()">
             <option value="vendas">Vendas por periodo</option>
+            <option value="mesas">Mesas atendidas</option>
             <option value="pix">Relatorio PIX</option>
             <option value="pagar">Contas a pagar</option>
             <option value="excecoes">Exceções / Exclusoes</option>
@@ -2379,6 +2381,14 @@ async function renderRelatorio(){
       '<div class="tbl"><table><thead><tr><th>Data/Hora</th><th>Forma</th><th>Total</th></tr></thead><tbody>'+
       (vendas.length?vendas.map(function(v){return'<tr><td>'+new Date(v.criado_em).toLocaleString('pt-BR')+'</td><td>'+v.forma_pagamento+'</td><td style="color:var(--green);font-weight:600">R$ '+Number(v.total).toFixed(2)+'</td></tr>'}).join(''):'<tr><td colspan="3"><div class="empty">Nenhuma venda</div></td></tr>')+
       '</tbody></table></div>'
+  } else if(tipo==='mesas'){
+    var res=await scopeCid(db.from('comandas').select('*')).eq('status','fechada').gte('fechada_em',dataInicio).order('fechada_em',{ascending:false})
+    var fechadas=res.data||[]
+    var total=fechadas.reduce(function(a,c){return a+Number(c.valor_total||0)},0)
+    el.innerHTML='<div class="mc b" style="margin-bottom:16px"><div class="lbl">Total em mesas no periodo</div><div class="val">R$ '+total.toFixed(2)+'</div><div class="sub">'+fechadas.length+' mesas atendidas</div></div>'+
+      '<div class="tbl"><table><thead><tr><th>Fechada em</th><th>Mesa</th><th>Cliente</th><th>Garcom</th><th>Forma</th><th>Total</th></tr></thead><tbody>'+
+      (fechadas.length?fechadas.map(function(c){return'<tr><td>'+new Date(c.fechada_em).toLocaleString('pt-BR')+'</td><td>'+c.mesa_numero+'</td><td>'+(c.cliente_nome||'-')+'</td><td>'+(c.garcom_abertura||'-')+'</td><td>'+(c.forma_pagamento||'-')+'</td><td style="color:var(--green);font-weight:600">R$ '+Number(c.valor_total||0).toFixed(2)+'</td></tr>'}).join(''):'<tr><td colspan="6"><div class="empty">Nenhuma mesa atendida no periodo</div></td></tr>')+
+      '</tbody></table></div>'
   } else if(tipo==='pix'){
     var res=await scopeCid(db.from('vendas').select('*')).eq('forma_pagamento','PIX').gte('criado_em',dataInicio).order('criado_em',{ascending:false})
     var vendas=res.data||[]
@@ -2408,7 +2418,7 @@ function printRel(){
   if(!el || !el.innerHTML.trim()){ toast('Carregue um relatorio primeiro', 1); return }
   var loja = localStorage.getItem('nome_loja') || 'ConvenFacil'
   var now = new Date().toLocaleString('pt-BR')
-  var titulos = {vendas:'Relatorio de Vendas', pix:'Relatorio PIX', pagar:'Relatorio Contas a Pagar', excecoes:'Relatorio de Excecoes'}
+  var titulos = {vendas:'Relatorio de Vendas', mesas:'Relatorio de Mesas Atendidas', pix:'Relatorio PIX', pagar:'Relatorio Contas a Pagar', excecoes:'Relatorio de Excecoes'}
   var html = '<!DOCTYPE html><html><head><meta charset="UTF-8">'+
     '<style>'+
     'body{font-family:Arial,sans-serif;font-size:12px;color:#000;padding:15px}'+
@@ -3772,6 +3782,34 @@ async function cancelarItemSilencioso(itemId){
   var m=mesasCache.find(function(x){return x.id===mesaAtualId})
   registrarExcecao('ITEM DE COMANDA CANCELADO',(m?'Mesa '+m.numero+' — ':'')+item.qtd+'x '+item.produto_nome,Number(item.preco_unit)*item.qtd)
   renderComanda()
+}
+
+// Imprime a comanda como esta agora (conferencia pro cliente ver o que ja consumiu),
+// sem fechar nada nem exigir forma de pagamento — pode imprimir varias vezes se quiser.
+function imprimirConferenciaComanda(){
+  if(!itensComandaCache.length){toast('Nenhum item lançado ainda',1);return}
+  var m=mesasCache.find(function(x){return x.id===mesaAtualId})
+  var loja=localStorage.getItem('nome_loja')||'CONVENFACIL'
+  var now=new Date()
+  var ativos=itensComandaCache.filter(function(it){return it.status!=='cancelado'})
+  var total=ativos.reduce(function(a,it){return a+Number(it.preco_unit)*it.qtd},0)
+  var itensHtml=ativos.map(function(it){
+    return '<div style="display:flex;justify-content:space-between"><span>'+it.qtd+'x '+it.produto_nome+'</span><span>R$ '+(Number(it.preco_unit)*it.qtd).toFixed(2)+'</span></div>'
+  }).join('')
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><style>'+
+    '*{margin:0;padding:0;box-sizing:border-box}body{font-family:"Courier New",monospace;font-size:11px;width:80mm;background:#fff;color:#000;padding:3mm}'+
+    '.c{text-align:center}.b{font-weight:bold}.g{font-size:14px}.linha{border-top:1px dashed #000;margin:4px 0}'+
+    '@media print{body{width:80mm}}</style></head><body>'+
+    '<div class="c b g">'+loja+'</div>'+
+    '<div class="c b">CONFERENCIA — MESA '+(m?m.numero:'')+'</div>'+
+    '<div class="c" style="font-size:10px">Nao e recibo, so conferencia do pedido</div>'+
+    '<div class="c">'+now.toLocaleString('pt-BR')+'</div>'+
+    '<div class="linha"></div>'+itensHtml+'<div class="linha"></div>'+
+    '<div style="display:flex;justify-content:space-between" class="b g"><span>TOTAL:</span><span>R$ '+total.toFixed(2)+'</span></div>'+
+    '<div class="linha"></div>'+
+    '<div class="c" style="font-size:10px">ConvenFacil - convenfacil.com.br</div>'+
+    '<br><br></body></html>'
+  imprimirComPreview(html,'Conferencia da mesa '+(m?m.numero:''))
 }
 
 // Sinalizar no mapa que o cliente pediu a conta (fica amarelo pros outros garcons verem)
