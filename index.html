@@ -2811,8 +2811,11 @@ document.addEventListener('keydown', function(e){
   }
 })
 
+function capitalizarNomeProd(s){
+  return s.replace(/(^|\s)([a-zà-ú])/gi,function(m,sep,letra){return sep+letra.toUpperCase()})
+}
 async function saveProd(){
-  var nome=document.getElementById('np-n').value.trim()
+  var nome=capitalizarNomeProd(document.getElementById('np-n').value.trim())
   if(!nome){toast('Informe o nome',1);return}
   var id=document.getElementById('np-id').value
   var prod={nome:nome,codigo_barras:document.getElementById('np-c').value||null,categoria:document.getElementById('np-cat').value,emoji:document.getElementById('np-e').value||'&#x1F4E6;',preco_custo:parseFloat(document.getElementById('np-k').value)||0,preco_venda:parseFloat(document.getElementById('np-v').value)||0,estoque:parseInt(document.getElementById('np-q').value)||0,estoque_minimo:parseInt(document.getElementById('np-m').value)||5,validade:document.getElementById('np-val').value||null}
