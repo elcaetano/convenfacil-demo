@@ -376,6 +376,7 @@ tr:hover td{background:var(--bg2)}
         </div>
         <div class="nav-items" id="grp-vendas-items">
           <div class="nav-item on" id="nav-pdv" onclick="go('pdv',this)"><span class="nav-ic">&#x1F6D2;</span><span>PDV / Caixa</span></div>
+          <div class="nav-item" id="nav-caixa" onclick="go('caixa',this)"><span class="nav-ic">&#x1F5C4;</span><span>Turno de Caixa</span></div>
           <div class="nav-item" id="nav-mesas" onclick="go('mesas',this)" style="display:none"><span class="nav-ic">&#x1F37D;</span><span>Mesas</span></div>
           <div class="nav-item" id="nav-kds" onclick="go('kds',this)" style="display:none"><span class="nav-ic">&#x1F373;</span><span>Cozinha (KDS)</span></div>
           <div class="nav-item" id="nav-promos" onclick="go('promos',this)"><span class="nav-ic">&#x1F525;</span><span>Promoções</span></div>
@@ -480,6 +481,14 @@ tr:hover td{background:var(--bg2)}
             <button class="btn-clear" onclick="clearCart()">&#x1F5D1; Limpar pedido</button>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- TURNO DE CAIXA -->
+    <div class="sec" id="sec-caixa">
+      <div class="topbar"><h1>Turno de Caixa</h1></div>
+      <div class="sec-body">
+        <div id="caixa-content"><div class="loading"><div class="spin"></div>Carregando...</div></div>
       </div>
     </div>
 
@@ -637,6 +646,8 @@ tr:hover td{background:var(--bg2)}
           <select id="rel-tipo" onchange="renderRelatorio()">
             <option value="vendas">Vendas por periodo</option>
             <option value="vendas_forma">Vendas por forma de pagamento</option>
+            <option value="fechamento_caixa">Fechamento de caixa</option>
+            <option value="sangrias">Sangrias e suprimentos</option>
             <option value="mesas">Mesas atendidas</option>
             <option value="pix">Relatorio PIX</option>
             <option value="abc">Curva ABC de produtos</option>
@@ -1274,6 +1285,31 @@ tr:hover td{background:var(--bg2)}
   </div>
 </div>
 
+<!-- MODAL SANGRIA/SUPRIMENTO DE CAIXA -->
+<div class="ov" id="ov-movimento-caixa">
+  <div class="modal" style="max-width:380px">
+    <h2 id="mc-titulo">Sangria</h2>
+    <div class="fg"><label>Valor (R$)</label><input type="number" id="mc-valor" placeholder="0,00" step="0.01" min="0"></div>
+    <div class="fg"><label>Motivo</label><input type="text" id="mc-motivo" placeholder="Ex: pagamento de entregador"></div>
+    <div class="modal-ft"><button class="btn" onclick="closeModals()">Cancelar</button><button class="btn acc" onclick="confirmarMovimentoCaixa()">&#x2713; Confirmar</button></div>
+  </div>
+</div>
+
+<!-- MODAL FECHAR CAIXA -->
+<div class="ov" id="ov-fechar-caixa">
+  <div class="modal" style="max-width:420px">
+    <h2>&#x1F512; Fechar caixa</h2>
+    <div class="fg"><label>Valor esperado em dinheiro (calculado pelo sistema)</label><div id="fc-esperado" style="font-size:20px;font-weight:800;color:var(--green);padding:6px 0">R$ 0,00</div></div>
+    <div class="fg"><label>Valor contado no caixa (R$)</label><input type="number" id="fc-informado" placeholder="0,00" step="0.01" min="0" oninput="calcDiferencaCaixa()"></div>
+    <div id="fc-diferenca-wrap" style="display:none;margin:10px 0;padding:10px;border-radius:var(--rad);text-align:center">
+      <div style="font-size:11px;color:var(--txt3);text-transform:uppercase;margin-bottom:4px">Diferenca</div>
+      <div id="fc-diferenca" style="font-size:20px;font-weight:800"></div>
+    </div>
+    <div class="fg"><label>Observacao (opcional)</label><input type="text" id="fc-obs" placeholder="Ex: sobrou troco de outro turno"></div>
+    <div class="modal-ft"><button class="btn" onclick="closeModals()">Cancelar</button><button class="btn grn" onclick="confirmarFecharCaixa()">&#x2713; Confirmar fechamento</button></div>
+  </div>
+</div>
+
 <!-- MODAL CONFIRMACAO GENERICA (exclusoes etc) -->
 <div class="ov" id="ov-confirm-generico">
   <div class="modal" style="text-align:center;max-width:380px">
@@ -1598,6 +1634,7 @@ function go(id,el){
   if(id==='excecoes')carregarExcecoes().then(renderExceções)
   if(id==='mesas')renderMesas()
   if(id==='kds')renderKds()
+  if(id==='caixa')renderCaixa()
 }
 
 // BARCODE
@@ -2417,6 +2454,138 @@ async function receberConta(id){
 }
 
 // RELATÓRIOS
+// TURNO DE CAIXA — abertura/fechamento com contagem + sangrias (retiradas) e suprimentos (reforcos).
+// So considera vendas EXATAMENTE "Dinheiro" (PDV) e comandas fechadas "Dinheiro" no calculo do
+// esperado — fechamentos de mesa com "Dividir conta" nao entram na parte em dinheiro (mesma
+// limitacao do relatorio "Vendas por forma de pagamento": o texto salvo ali e um resumo livre).
+var turnoAtual=null
+var caixaValorEsperado=0
+
+async function renderCaixa(){
+  var el=document.getElementById('caixa-content')
+  el.innerHTML='<div class="loading"><div class="spin"></div>Carregando...</div>'
+  var res=await scopeCid(db.from('turnos_caixa').select('*')).eq('status','aberto').order('aberto_em',{ascending:false}).limit(1)
+  turnoAtual=(res.data&&res.data[0])||null
+  if(!turnoAtual){
+    el.innerHTML='<div class="mc" style="max-width:420px">'+
+      '<div class="lbl">Nenhum caixa aberto</div>'+
+      '<p style="font-size:13px;color:var(--txt2);margin:10px 0">Abra o caixa informando o valor inicial (fundo de troco) antes de comecar a vender.</p>'+
+      '<div class="fg"><label>Valor de abertura (R$)</label><input type="number" id="caixa-valor-abertura" placeholder="0,00" step="0.01" min="0"></div>'+
+      '<button class="btn grn" style="width:100%;justify-content:center;margin-top:10px" onclick="confirmarAberturaCaixa()">&#x1F513; Abrir caixa</button>'+
+    '</div>'
+    return
+  }
+  var movRes=await scopeCid(db.from('movimentos_caixa').select('*')).eq('turno_id',turnoAtual.id).order('criado_em',{ascending:false})
+  var movs=movRes.data||[]
+  var sangrias=movs.filter(function(m){return m.tipo==='sangria'}).reduce(function(a,m){return a+Number(m.valor)},0)
+  var suprimentos=movs.filter(function(m){return m.tipo==='suprimento'}).reduce(function(a,m){return a+Number(m.valor)},0)
+  el.innerHTML='<div class="mc g" style="max-width:520px;margin-bottom:16px">'+
+      '<div class="lbl">Caixa aberto</div>'+
+      '<div class="val" style="font-size:16px">Desde '+new Date(turnoAtual.aberto_em).toLocaleString('pt-BR')+'</div>'+
+      '<div class="sub">Aberto por '+turnoAtual.usuario_abertura+' &bull; Valor inicial: R$ '+Number(turnoAtual.valor_abertura).toFixed(2)+'</div>'+
+    '</div>'+
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">'+
+      '<button class="btn red" onclick="abrirMovimentoCaixa(\'sangria\')">&#x2796; Sangria (retirar)</button>'+
+      '<button class="btn grn" onclick="abrirMovimentoCaixa(\'suprimento\')">&#x2795; Suprimento (adicionar)</button>'+
+      '<button class="btn acc" onclick="abrirFecharCaixa()">&#x1F512; Fechar caixa</button>'+
+    '</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;max-width:520px">'+
+      '<div class="mc r"><div class="lbl">Sangrias no turno</div><div class="val">R$ '+sangrias.toFixed(2)+'</div></div>'+
+      '<div class="mc g"><div class="lbl">Suprimentos no turno</div><div class="val">R$ '+suprimentos.toFixed(2)+'</div></div>'+
+    '</div>'+
+    '<div class="tbl"><table><thead><tr><th>Quando</th><th>Tipo</th><th>Motivo</th><th>Valor</th><th>Quem</th></tr></thead><tbody>'+
+    (movs.length?movs.map(function(m){
+      return'<tr><td>'+new Date(m.criado_em).toLocaleString('pt-BR')+'</td><td>'+(m.tipo==='sangria'?'&#x2796; Sangria':'&#x2795; Suprimento')+'</td><td>'+(m.motivo||'-')+'</td><td style="font-weight:600">R$ '+Number(m.valor).toFixed(2)+'</td><td>'+(m.usuario_nome||'-')+'</td></tr>'
+    }).join(''):'<tr><td colspan="5"><div class="empty">Nenhuma movimentacao nesse turno</div></td></tr>')+
+    '</tbody></table></div>'
+}
+
+async function confirmarAberturaCaixa(){
+  var valor=parseFloat(document.getElementById('caixa-valor-abertura').value)||0
+  var res=await db.from('turnos_caixa').insert({cliente_id:meuCid(),usuario_abertura:userLogado.nome,valor_abertura:valor,status:'aberto'}).select().single()
+  if(res.error){toast('Erro ao abrir caixa',1);return}
+  toast('Caixa aberto!')
+  renderCaixa()
+}
+
+function abrirMovimentoCaixa(tipo){
+  if(!turnoAtual){toast('Nenhum caixa aberto',1);return}
+  document.getElementById('mc-titulo').setAttribute('data-tipo',tipo)
+  document.getElementById('mc-titulo').innerHTML=tipo==='sangria'?'&#x2796; Sangria (retirar dinheiro)':'&#x2795; Suprimento (adicionar dinheiro)'
+  document.getElementById('mc-valor').value=''
+  document.getElementById('mc-motivo').value=''
+  document.getElementById('ov-movimento-caixa').classList.add('open')
+}
+async function confirmarMovimentoCaixa(){
+  var tipo=document.getElementById('mc-titulo').getAttribute('data-tipo')
+  var valor=parseFloat(document.getElementById('mc-valor').value)||0
+  var motivo=document.getElementById('mc-motivo').value.trim()
+  if(valor<=0){toast('Informe um valor valido',1);return}
+  if(!motivo){toast('Informe o motivo',1);return}
+  if(!turnoAtual){toast('Nenhum caixa aberto',1);return}
+  await db.from('movimentos_caixa').insert({cliente_id:meuCid(),turno_id:turnoAtual.id,tipo:tipo,valor:valor,motivo:motivo,usuario_nome:userLogado.nome})
+  registrarExcecao(tipo==='sangria'?'SANGRIA DE CAIXA':'SUPRIMENTO DE CAIXA',motivo+' — R$ '+valor.toFixed(2),valor)
+  closeModals()
+  toast(tipo==='sangria'?'Sangria registrada':'Suprimento registrado')
+  renderCaixa()
+}
+
+async function abrirFecharCaixa(){
+  if(!turnoAtual)return
+  var vendasRes=await scopeCid(db.from('vendas').select('total')).eq('forma_pagamento','Dinheiro').gte('criado_em',turnoAtual.aberto_em)
+  var totalVendasDinheiro=(vendasRes.data||[]).reduce(function(a,v){return a+Number(v.total)},0)
+  var mesasRes=await scopeCid(db.from('comandas').select('valor_total')).eq('status','fechada').eq('forma_pagamento','Dinheiro').gte('fechada_em',turnoAtual.aberto_em)
+  var totalMesasDinheiro=(mesasRes.data||[]).reduce(function(a,c){return a+Number(c.valor_total||0)},0)
+  var movRes=await scopeCid(db.from('movimentos_caixa').select('*')).eq('turno_id',turnoAtual.id)
+  var movs=movRes.data||[]
+  var sangrias=movs.filter(function(m){return m.tipo==='sangria'}).reduce(function(a,m){return a+Number(m.valor)},0)
+  var suprimentos=movs.filter(function(m){return m.tipo==='suprimento'}).reduce(function(a,m){return a+Number(m.valor)},0)
+  caixaValorEsperado=Number(turnoAtual.valor_abertura)+totalVendasDinheiro+totalMesasDinheiro+suprimentos-sangrias
+  document.getElementById('fc-esperado').textContent='R$ '+caixaValorEsperado.toFixed(2)
+  document.getElementById('fc-informado').value=''
+  document.getElementById('fc-obs').value=''
+  document.getElementById('fc-diferenca-wrap').style.display='none'
+  document.getElementById('ov-fechar-caixa').classList.add('open')
+}
+function calcDiferencaCaixa(){
+  var informado=parseFloat(document.getElementById('fc-informado').value)
+  var wrap=document.getElementById('fc-diferenca-wrap')
+  if(isNaN(informado)){wrap.style.display='none';return}
+  var dif=informado-caixaValorEsperado
+  wrap.style.display='block'
+  var elDif=document.getElementById('fc-diferenca')
+  if(Math.abs(dif)<0.005){
+    wrap.style.background='var(--green-dim)';elDif.style.color='var(--green)';elDif.textContent='Bateu certinho!'
+  } else if(dif>0){
+    wrap.style.background='var(--green-dim)';elDif.style.color='var(--green)';elDif.textContent='Sobrou R$ '+dif.toFixed(2)
+  } else {
+    wrap.style.background='var(--red-dim)';elDif.style.color='var(--red)';elDif.textContent='Faltou R$ '+Math.abs(dif).toFixed(2)
+  }
+}
+async function confirmarFecharCaixa(){
+  var informadoRaw=document.getElementById('fc-informado').value
+  if(informadoRaw===''){toast('Informe o valor contado no caixa',1);return}
+  var informado=parseFloat(informadoRaw)||0
+  var dif=informado-caixaValorEsperado
+  var obs=document.getElementById('fc-obs').value.trim()
+  await db.from('turnos_caixa').update({
+    status:'fechado',
+    usuario_fechamento:userLogado.nome,
+    valor_informado:informado,
+    valor_esperado:caixaValorEsperado,
+    diferenca:dif,
+    fechado_em:new Date().toISOString(),
+    observacao:obs||null
+  }).eq('id',turnoAtual.id)
+  if(Math.abs(dif)>=0.01){
+    registrarExcecao('DIFERENCA NO FECHAMENTO DE CAIXA','Esperado R$ '+caixaValorEsperado.toFixed(2)+' — contado R$ '+informado.toFixed(2)+(obs?' — obs: '+obs:''),dif)
+  }
+  closeModals()
+  toast('Caixa fechado!')
+  turnoAtual=null
+  renderCaixa()
+}
+
 async function renderRelatorio(){
   var tipo=document.getElementById('rel-tipo').value
   var periodo=document.getElementById('rel-periodo').value
@@ -2564,6 +2733,32 @@ async function renderRelatorio(){
         '</tbody></table></div>':'<div class="empty">Sem vendas nesse horario</div>')+
       '</div>'
     }).join('')
+  } else if(tipo==='fechamento_caixa'){
+    var res=await scopeCid(db.from('turnos_caixa').select('*')).eq('status','fechado').gte('fechado_em',dataInicio).order('fechado_em',{ascending:false})
+    var turnos=res.data||[]
+    var totalDif=turnos.reduce(function(a,t){return a+Number(t.diferenca||0)},0)
+    el.innerHTML='<div class="mc '+(totalDif<0?'r':'g')+'" style="margin-bottom:16px"><div class="lbl">Diferenca total no periodo</div><div class="val">R$ '+totalDif.toFixed(2)+'</div><div class="sub">'+turnos.length+' turnos fechados</div></div>'+
+      '<div class="tbl"><table><thead><tr><th>Aberto</th><th>Fechado</th><th>Abriu</th><th>Fechou</th><th>Valor abertura</th><th>Esperado</th><th>Contado</th><th>Diferenca</th></tr></thead><tbody>'+
+      (turnos.length?turnos.map(function(t){
+        var dif=Number(t.diferenca||0)
+        var cor=Math.abs(dif)<0.005?'var(--txt2)':(dif<0?'var(--red)':'var(--green)')
+        return'<tr><td>'+new Date(t.aberto_em).toLocaleString('pt-BR')+'</td><td>'+new Date(t.fechado_em).toLocaleString('pt-BR')+'</td><td>'+t.usuario_abertura+'</td><td>'+(t.usuario_fechamento||'-')+'</td><td>R$ '+Number(t.valor_abertura).toFixed(2)+'</td><td>R$ '+Number(t.valor_esperado||0).toFixed(2)+'</td><td>R$ '+Number(t.valor_informado||0).toFixed(2)+'</td><td style="color:'+cor+';font-weight:600">R$ '+dif.toFixed(2)+'</td></tr>'
+      }).join(''):'<tr><td colspan="8"><div class="empty">Nenhum turno fechado no periodo</div></td></tr>')+
+      '</tbody></table></div>'
+  } else if(tipo==='sangrias'){
+    var res=await scopeCid(db.from('movimentos_caixa').select('*')).gte('criado_em',dataInicio).order('criado_em',{ascending:false})
+    var movs=res.data||[]
+    var sangrias=movs.filter(function(m){return m.tipo==='sangria'}).reduce(function(a,m){return a+Number(m.valor)},0)
+    var suprimentos=movs.filter(function(m){return m.tipo==='suprimento'}).reduce(function(a,m){return a+Number(m.valor)},0)
+    el.innerHTML='<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">'+
+        '<div class="mc r"><div class="lbl">Total em sangrias</div><div class="val">R$ '+sangrias.toFixed(2)+'</div><div class="sub">Retirado do caixa</div></div>'+
+        '<div class="mc g"><div class="lbl">Total em suprimentos</div><div class="val">R$ '+suprimentos.toFixed(2)+'</div><div class="sub">Adicionado ao caixa</div></div>'+
+      '</div>'+
+      '<div class="tbl"><table><thead><tr><th>Quando</th><th>Tipo</th><th>Motivo</th><th>Valor</th><th>Quem</th></tr></thead><tbody>'+
+      (movs.length?movs.map(function(m){
+        return'<tr><td>'+new Date(m.criado_em).toLocaleString('pt-BR')+'</td><td>'+(m.tipo==='sangria'?'&#x2796; Sangria':'&#x2795; Suprimento')+'</td><td>'+(m.motivo||'-')+'</td><td style="font-weight:600">R$ '+Number(m.valor).toFixed(2)+'</td><td>'+(m.usuario_nome||'-')+'</td></tr>'
+      }).join(''):'<tr><td colspan="5"><div class="empty">Nenhuma sangria/suprimento no periodo</div></td></tr>')+
+      '</tbody></table></div>'
   } else if(tipo==='mesas'){
     var res=await scopeCid(db.from('comandas').select('*')).eq('status','fechada').gte('fechada_em',dataInicio).order('fechada_em',{ascending:false})
     var fechadas=res.data||[]
@@ -2601,7 +2796,7 @@ function printRel(){
   if(!el || !el.innerHTML.trim()){ toast('Carregue um relatorio primeiro', 1); return }
   var loja = localStorage.getItem('nome_loja') || 'ConvenFacil'
   var now = new Date().toLocaleString('pt-BR')
-  var titulos = {vendas:'Relatorio de Vendas', vendas_forma:'Vendas por Forma de Pagamento', mesas:'Relatorio de Mesas Atendidas', pix:'Relatorio PIX', abc:'Curva ABC de Produtos', giro:'Giro de Estoque', horario:'Mais Vendidos por Horario', pagar:'Relatorio Contas a Pagar', excecoes:'Relatorio de Excecoes'}
+  var titulos = {vendas:'Relatorio de Vendas', vendas_forma:'Vendas por Forma de Pagamento', fechamento_caixa:'Fechamento de Caixa', sangrias:'Sangrias e Suprimentos', mesas:'Relatorio de Mesas Atendidas', pix:'Relatorio PIX', abc:'Curva ABC de Produtos', giro:'Giro de Estoque', horario:'Mais Vendidos por Horario', pagar:'Relatorio Contas a Pagar', excecoes:'Relatorio de Excecoes'}
   var html = '<!DOCTYPE html><html><head><meta charset="UTF-8">'+
     '<style>'+
     'body{font-family:Arial,sans-serif;font-size:12px;color:#000;padding:15px}'+
