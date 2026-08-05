@@ -348,8 +348,8 @@ tr:hover td{background:var(--bg2)}
     <div class="login-title">Bem-vindo de volta</div>
     <div class="login-sub">Entre com suas credenciais</div>
     <div class="login-err" id="login-err"></div>
-    <div class="fg"><label>Email</label><input type="email" id="login-email" placeholder="seu@email.com" onkeydown="if(event.key==='Enter')doLogin()"></div>
-    <div class="fg"><label>Senha</label><input type="password" id="login-senha" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <div class="fg"><label>Email</label><input type="email" id="login-email" placeholder="seu@email.com" autocomplete="username" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <div class="fg"><label>Senha</label><input type="password" id="login-senha" placeholder="••••••••" autocomplete="new-password" onkeydown="if(event.key==='Enter')doLogin()"></div>
     <button class="btn-login" onclick="doLogin()" id="btn-login-do">Entrar no sistema</button>
     <div class="login-footer">ConvênFácil &copy; 2025 &mdash; <a href="https://ninjai.com.br" target="_blank"><img src="https://www.ninjai.com.br/ninjai-logo.png" alt="NinjAI" style="height:16px;vertical-align:middle;opacity:.7;transition:.2s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.7"></a></div>
   </div>
@@ -1441,6 +1441,9 @@ async function doLogin(){
       await db.auth.signOut()
       err.textContent='Usuario inativo ou nao encontrado';err.style.display='block';btn.textContent='Entrar no sistema';btn.disabled=false;return
     }
+    // So guarda o EMAIL pra facilitar o proximo login (autopreenche o campo).
+    // A senha nunca fica guardada em lugar nenhum do app.
+    try{localStorage.setItem('ultimo_login_email',email)}catch(e){}
     userLogado=perfil;iniciarApp()
   }catch(e){err.textContent='Erro de conexao';err.style.display='block';btn.textContent='Entrar no sistema';btn.disabled=false}
 }
@@ -1530,7 +1533,8 @@ function doLogout(){
   userLogado=null;cart=[]
   document.getElementById('app').classList.remove('on')
   document.getElementById('login-wrap').style.display='flex'
-  document.getElementById('login-email').value=''
+  // Mantem so o email preenchido (facilita o proximo login); a senha some sempre.
+  try{document.getElementById('login-email').value=localStorage.getItem('ultimo_login_email')||''}catch(e){document.getElementById('login-email').value=''}
   document.getElementById('login-senha').value=''
   document.getElementById('btn-login-do').textContent='Entrar no sistema'
   document.getElementById('btn-login-do').disabled=false
@@ -4149,6 +4153,11 @@ function toast(msg,err){
 
 loadProds();loadPromos()
 restaurarSessao()
+// Autopreenche so o email na tela de boas-vindas (nunca a senha).
+try{
+  var emailSalvo=localStorage.getItem('ultimo_login_email')
+  if(emailSalvo)document.getElementById('login-email').value=emailSalvo
+}catch(e){}
 </script>
 </body>
 </html>
