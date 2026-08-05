@@ -1283,7 +1283,10 @@ const SURL='https://jkantpfxudbqzrtrctgp.supabase.co'
 const SKEY='sb_publishable_DeHWabj6Oh13qkMB7KzNfQ_5e6ZW9Fm'
 const ADMIN_FN_URL=SURL+'/functions/v1/admin-users'
 const {createClient}=supabase
-const db=createClient(SURL,SKEY)
+// Sessao guardada em sessionStorage (nao localStorage): sobrevive a atualizar a pagina/aba
+// (nao precisa logar de novo o tempo todo), mas MORRE ao fechar o navegador de verdade.
+// Isso evita que quem sentar depois no mesmo computador entre direto sem senha, so digitando o endereco.
+const db=createClient(SURL,SKEY,{auth:{storage:window.sessionStorage,persistSession:true,autoRefreshToken:true}})
 
 let prods=[],cart=[],cartSnapshot=[],catA='Todos',promos=[],userLogado=null,payMetodo=null
 let excecoes=[]
@@ -1546,6 +1549,9 @@ function toggleGrp(id){
   var items=document.getElementById('grp-'+id+'-items')
   if(!header||!items)return
   var isOpen=items.classList.contains('open')
+  // Accordion: ao abrir um grupo, fecha os outros que estavam abertos.
+  document.querySelectorAll('.nav-items.open').forEach(function(el){if(el!==items)el.classList.remove('open')})
+  document.querySelectorAll('.nav-group-header.open').forEach(function(el){if(el!==header)el.classList.remove('open')})
   if(isOpen){items.classList.remove('open');header.classList.remove('open')}
   else{items.classList.add('open');header.classList.add('open')}
 }
