@@ -70,6 +70,11 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg0);color:
 .nav-ic{font-size:15px;width:18px;text-align:center;flex-shrink:0}
 .badge{background:var(--red);color:#fff;font-size:10px;padding:1px 6px;border-radius:20px;margin-left:auto;font-weight:700}
 
+/* MODO MOBILE — botao hamburger (fixo, abre/fecha a gaveta do menu lateral) e overlay escuro */
+.mobile-menu-btn{display:none;position:fixed;top:10px;left:10px;z-index:720;width:36px;height:36px;align-items:center;justify-content:center;border-radius:var(--rad);border:1px solid var(--border2);background:var(--bg2);color:var(--txt1);font-size:18px;cursor:pointer}
+.mobile-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:690}
+.mobile-overlay.on{display:block}
+
 .sf{padding:12px 14px;border-top:1px solid var(--border)}
 .sf-user{display:flex;align-items:center;gap:9px;margin-bottom:8px}
 .sf-avatar{width:30px;height:30px;background:linear-gradient(135deg,var(--acc),var(--purple));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0}
@@ -105,6 +110,11 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg0);color:
 
 /* PDV */
 .pdv-layout{display:grid;grid-template-columns:1fr 320px;gap:14px;flex:1;overflow:hidden;padding:14px 20px}
+/* MODO MOBILE — abas pra alternar entre Produtos e Pedido (escondidas fora do mobile) */
+.pdv-tabs{display:none;gap:8px;padding:0 12px 8px}
+.pdv-tabs button{flex:1;padding:10px;border-radius:var(--rad);border:1px solid var(--border2);background:var(--bg3);color:var(--txt2);font-weight:700;font-size:13px;cursor:pointer;font-family:inherit}
+.pdv-tabs button.on{background:var(--acc-dim);color:var(--acc);border-color:var(--acc)}
+.pdv-tabs .badge2{background:var(--red);color:#fff;font-size:10px;padding:1px 6px;border-radius:20px;margin-left:6px;font-weight:700}
 .pdv-left{display:flex;flex-direction:column;gap:10px;overflow:hidden}
 .search-box{display:flex;gap:8px}
 .search-input{flex:1;padding:10px 14px;border-radius:var(--rad);border:1px solid var(--border);background:var(--bg2);font-size:13px;color:var(--txt1);outline:none;font-family:inherit;transition:.15s}
@@ -340,6 +350,42 @@ tr:hover td{background:var(--bg2)}
   .cards-grid{grid-template-columns:repeat(2,1fr)!important}
   .two-col{grid-template-columns:1fr!important}
 }
+
+/* ===== MODO MOBILE (celular/tablet estreito) ===== */
+@media (max-width:768px){
+  /* Menu lateral vira gaveta: fica escondido fora da tela e desliza por cima do conteudo */
+  .sidebar{position:fixed;top:0;bottom:0;left:0;z-index:700;transform:translateX(-100%);transition:transform .25s ease;box-shadow:0 0 30px rgba(0,0,0,.5)}
+  .sidebar.mobile-open{transform:translateX(0)}
+  .mobile-menu-btn{display:flex}
+
+  /* Atalho de teclado nao faz sentido sem teclado fisico (celular) */
+  .atalhos-global{display:none!important}
+  .main{padding-top:0!important}
+
+  /* Topbar: abre espaco pro botao hamburger e permite quebrar linha se tiver varios botoes */
+  .topbar{padding:12px 14px 12px 54px;flex-wrap:wrap;gap:8px;row-gap:6px}
+  .topbar h1{font-size:15px}
+  .topbar-right{flex-wrap:wrap;gap:6px}
+
+  /* PDV: produtos e pedido viram abas (uma tela de cada vez) em vez de lado a lado */
+  .pdv-layout{display:flex;flex-direction:column;padding:8px 10px;gap:8px;overflow:hidden}
+  .pdv-tabs{display:flex}
+  .pdv-left,.cart{flex:1;min-height:0}
+  .pdv-left.mobile-hide,.cart.mobile-hide{display:none!important}
+
+  /* Cartoes de resumo (financeiro, master, funcionalidades) — menos colunas pra nao espremer */
+  .cards-grid{grid-template-columns:repeat(2,1fr)!important}
+  .sa-cards{grid-template-columns:1fr!important}
+  .func-grid{grid-template-columns:repeat(2,1fr)!important}
+
+  /* Formularios dos modais: 1 coluna so, mais facil de preencher com o dedo */
+  .fgrid.c2,.fgrid.c3{grid-template-columns:1fr}
+  .modal{padding:18px}
+
+  /* Tabelas (Relatorios/Financeiro/Estoque): em vez de cortar as colunas, rola de lado */
+  .tbl{overflow-x:auto;overflow-y:hidden}
+  .tbl table{width:max-content;min-width:100%}
+}
 </style>
 </head>
 <body>
@@ -436,6 +482,10 @@ tr:hover td{background:var(--bg2)}
 
   <div class="atalhos-global" title="F2 busca produto | F3 leitor USB | F4 finalizar venda | F6 imprimir cupom | Ctrl+Delete limpar pedido | F10 chama o PDV de qualquer tela">&#x2328; F2 busca &bull; F3 leitor &bull; F4 finalizar &bull; F6 cupom &bull; Ctrl+Del limpar &bull; F10 volta ao PDV (funciona em qualquer tela)</div>
 
+  <!-- MODO MOBILE: botao hamburger fixo (abre/fecha o menu lateral) + overlay escuro -->
+  <button class="mobile-menu-btn" onclick="toggleMobileSidebar()" title="Menu">&#9776;</button>
+  <div class="mobile-overlay" id="mobile-overlay" onclick="toggleMobileSidebar()"></div>
+
   <div class="main">
 
     <!-- PDV -->
@@ -458,15 +508,19 @@ tr:hover td{background:var(--bg2)}
         </div>
         <div id="camera-reader" style="max-width:400px"></div>
       </div>
+      <div class="pdv-tabs">
+        <button id="pdv-tab-produtos" class="on" onclick="pdvMobileTab('produtos')">&#x1F6D2; Produtos</button>
+        <button id="pdv-tab-pedido" onclick="pdvMobileTab('pedido')">&#x1F9FE; Pedido<span class="badge2" id="pdv-tab-badge" style="display:none">0</span></button>
+      </div>
       <div class="pdv-layout">
-        <div class="pdv-left">
+        <div class="pdv-left" id="pdv-left">
           <div class="search-box">
             <input class="search-input" type="text" id="srch" placeholder="Buscar produto..." oninput="filterProds()">
           </div>
           <div class="cat-filter" id="cat-filter"></div>
           <div class="pgrid" id="pgrid"><div class="loading" style="grid-column:1/-1"><div class="spin"></div>Carregando...</div></div>
         </div>
-        <div class="cart">
+        <div class="cart" id="pdv-cart">
           <div class="cart-hd"><h3>&#x1F9FE; Pedido atual</h3><span class="cc" id="cc" style="display:none">0</span></div>
           <div class="cart-items" id="citems"><div class="empty">&#x1F6D2; Nenhum item</div></div>
           <div class="cart-ft">
@@ -1635,6 +1689,31 @@ function go(id,el){
   if(id==='mesas')renderMesas()
   if(id==='kds')renderKds()
   if(id==='caixa')renderCaixa()
+  // No celular, navegar fecha a gaveta do menu sozinho (senao fica cobrindo a tela nova)
+  if(window.innerWidth<=768)fecharMobileSidebar()
+}
+
+// MODO MOBILE — gaveta do menu lateral
+function toggleMobileSidebar(){
+  document.querySelector('.sidebar').classList.toggle('mobile-open')
+  document.getElementById('mobile-overlay').classList.toggle('on')
+}
+function fecharMobileSidebar(){
+  document.querySelector('.sidebar').classList.remove('mobile-open')
+  document.getElementById('mobile-overlay').classList.remove('on')
+}
+
+// MODO MOBILE — PDV: alterna entre a aba "Produtos" e a aba "Pedido" (lado a lado no desktop,
+// uma tela de cada vez no celular). Fora do mobile essas classes nao tem efeito (ver CSS).
+function pdvMobileTab(tab){
+  var esq=document.getElementById('pdv-left')
+  var carrinho=document.getElementById('pdv-cart')
+  if(esq)esq.classList.toggle('mobile-hide',tab!=='produtos')
+  if(carrinho)carrinho.classList.toggle('mobile-hide',tab!=='pedido')
+  var btnProd=document.getElementById('pdv-tab-produtos')
+  var btnPed=document.getElementById('pdv-tab-pedido')
+  if(btnProd)btnProd.classList.toggle('on',tab==='produtos')
+  if(btnPed)btnPed.classList.toggle('on',tab==='pedido')
 }
 
 // BARCODE
@@ -1729,6 +1808,8 @@ function renderCart(){
   var cc=document.getElementById('cc')
   var ti=cart.reduce(function(a,c){return a+c.qty},0)
   if(ti>0){cc.textContent=ti;cc.style.display=''}else cc.style.display='none'
+  var badge=document.getElementById('pdv-tab-badge')
+  if(badge){ if(ti>0){badge.textContent=ti;badge.style.display=''}else badge.style.display='none' }
   if(!cart.length){el.innerHTML='<div class="empty">&#x1F6D2; Nenhum item</div>';updTot();salvarRascunhoCart();return}
   el.innerHTML=cart.map(function(c){
     return'<div class="ci">'+
