@@ -87,6 +87,10 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg0);color:
 .topbar-right{display:flex;align-items:center;gap:8px}
 .sec-body{padding:18px 20px;flex:1;overflow-y:auto}
 
+/* Barra de atalhos: fixa no rodape, visivel em qualquer tela do sistema (nao so no PDV) */
+.atalhos-global{position:fixed;left:236px;right:12px;bottom:8px;z-index:500;font-size:11px;color:var(--txt3);background:var(--bg1);border:1px solid var(--border);border-radius:var(--rad);padding:5px 12px;text-align:center;pointer-events:none;user-select:none}
+@media print{.atalhos-global{display:none!important}}
+
 /* BUTTONS */
 .btn{padding:7px 14px;border-radius:var(--rad);border:1px solid var(--border2);background:var(--bg3);cursor:pointer;font-size:13px;font-weight:500;color:var(--txt1);display:inline-flex;align-items:center;gap:6px;transition:.15s;font-family:inherit}
 .btn:hover{background:var(--bg4)}
@@ -427,6 +431,8 @@ tr:hover td{background:var(--bg2)}
     </div>
   </div>
 
+  <div class="atalhos-global" title="F2 busca produto | F3 leitor USB | F4 finalizar venda | F6 imprimir cupom | Ctrl+Delete limpar pedido | F10 chama o PDV de qualquer tela">&#x2328; F2 busca &bull; F3 leitor &bull; F4 finalizar &bull; F6 cupom &bull; Ctrl+Del limpar &bull; F10 volta ao PDV (funciona em qualquer tela)</div>
+
   <div class="main">
 
     <!-- PDV -->
@@ -434,7 +440,6 @@ tr:hover td{background:var(--bg2)}
       <div class="topbar">
         <h1>PDV &mdash; Caixa</h1>
         <div class="topbar-right">
-          <span style="font-size:11px;color:var(--txt3)" title="F2 busca produto | F3 leitor USB | F4 finalizar venda | F6 imprimir cupom | Ctrl+Delete limpar pedido | F10 chama o PDV de qualquer tela">&#x2328; F2 busca &bull; F3 leitor &bull; F4 finalizar &bull; F6 cupom &bull; Ctrl+Del limpar &bull; F10 volta ao PDV</span>
           <span style="font-size:12px;color:var(--txt3)" id="pdv-info">Carregando...</span>
           <button class="btn sm" onclick="toggleBarcode()" id="btn-barcode" title="Leitor USB de codigo de barras">&#x1F4F0; USB</button>
           <button class="btn sm" onclick="toggleCamera()" id="btn-camera" title="Leitor por camera">&#x1F4F7; Camera</button>
