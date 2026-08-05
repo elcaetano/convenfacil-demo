@@ -3020,7 +3020,7 @@ async function delClienteFiado(id){
 }
 
 async function addClienteFiado(){
-  var nome=document.getElementById('ncf-nome').value.trim()
+  var nome=capitalizarNomeProd(document.getElementById('ncf-nome').value.trim())
   var tel=document.getElementById('ncf-tel').value.trim()
   var cpf=document.getElementById('ncf-cpf').value.trim()
   var cep=document.getElementById('ncf-cep').value.trim()
@@ -3168,7 +3168,7 @@ function abrirCriarDono(clienteId,clienteNome){
 
 async function confirmarCriarDono(){
   var clienteId=document.getElementById('sao-cliente-id').value
-  var nome=document.getElementById('sao-nome').value.trim()
+  var nome=capitalizarNomeProd(document.getElementById('sao-nome').value.trim())
   var email=document.getElementById('sao-email').value.trim()
   var senha=document.getElementById('sao-senha').value
   if(!nome||!email||!senha){toast('Preencha todos os campos',1);return}
@@ -3272,8 +3272,20 @@ document.addEventListener('keydown', function(e){
   }
 })
 
+// Capitaliza nomes de produtos, pessoas e enderecos: primeira letra de cada
+// palavra maiuscula, mas particulas (da,de,di,do,das,dos) ficam minusculas
+// quando nao estao no inicio da frase. Ex: "joao da silva" -> "Joao da Silva"
+var PARTICULAS_MINUSCULAS=['da','de','di','do','das','dos']
 function capitalizarNomeProd(s){
-  return s.replace(/(^|\s)([a-zà-ú])/gi,function(m,sep,letra){return sep+letra.toUpperCase()})
+  if(!s)return s
+  return s.split(/(\s+)/).map(function(parte,i){
+    if(/^\s+$/.test(parte))return parte
+    var idxPalavra=Math.floor(i/2)
+    var low=parte.toLowerCase()
+    if(idxPalavra>0 && PARTICULAS_MINUSCULAS.indexOf(low)!==-1)return low
+    // capitaliza tambem depois de hifen, ex: "joao-pedro" -> "Joao-Pedro"
+    return low.replace(/(^|-)([a-zà-ÿ])/g,function(m,sep,letra){return sep+letra.toUpperCase()})
+  }).join('')
 }
 async function saveProd(){
   var nome=capitalizarNomeProd(document.getElementById('np-n').value.trim())
@@ -3337,7 +3349,7 @@ async function chamarAdminUsers(payload){
 }
 
 async function addUser(){
-  var nome=document.getElementById('nu-nome').value.trim()
+  var nome=capitalizarNomeProd(document.getElementById('nu-nome').value.trim())
   var email=document.getElementById('nu-email').value.trim()
   var senha=document.getElementById('nu-senha').value
   var nivel=document.getElementById('nu-nivel').value
@@ -3363,7 +3375,7 @@ async function addContaPagar(){
 
 async function addContaReceber(){
   var desc=document.getElementById('ncr-desc').value.trim()
-  var cliente=document.getElementById('ncr-cliente').value.trim()
+  var cliente=capitalizarNomeProd(document.getElementById('ncr-cliente').value.trim())
   var valor=parseFloat(document.getElementById('ncr-valor').value)||0
   var venc=document.getElementById('ncr-venc').value
   var obs=document.getElementById('ncr-obs').value
@@ -3374,7 +3386,7 @@ async function addContaReceber(){
 }
 
 async function addSaCliente(){
-  var nome=document.getElementById('nc-nome').value.trim()
+  var nome=capitalizarNomeProd(document.getElementById('nc-nome').value.trim())
   var email=document.getElementById('nc-email').value.trim()
   var tel=document.getElementById('nc-tel').value
   var plano=document.getElementById('nc-plano').value
@@ -3404,7 +3416,7 @@ async function buscarCEP(){
     var res=await fetch('https://viacep.com.br/ws/'+cep+'/json/')
     var data=await res.json()
     if(!data.erro){
-      document.getElementById('ncf-end').value=data.logradouro+', '+data.bairro+', '+data.localidade+' - '+data.uf
+      document.getElementById('ncf-end').value=capitalizarNomeProd(data.logradouro+', '+data.bairro+', '+data.localidade)+' - '+data.uf
       toast('Endereço encontrado!')
     } else toast('CEP não encontrado',1)
   }catch(e){toast('Erro ao buscar CEP',1)}
@@ -3542,11 +3554,11 @@ function atualizarStatusConfigs(){
 }
 
 function salvarConfigLoja(){
-  localStorage.setItem('nome_loja',document.getElementById('cfg-nome').value)
+  localStorage.setItem('nome_loja',capitalizarNomeProd(document.getElementById('cfg-nome').value.trim()))
   localStorage.setItem('cnpj_loja',document.getElementById('cfg-cnpj').value)
   localStorage.setItem('tel_loja',document.getElementById('cfg-tel').value)
-  localStorage.setItem('end_loja',document.getElementById('cfg-end').value)
-  localStorage.setItem('cidade_loja',document.getElementById('cfg-cidade').value)
+  localStorage.setItem('end_loja',capitalizarNomeProd(document.getElementById('cfg-end').value.trim()))
+  localStorage.setItem('cidade_loja',capitalizarNomeProd(document.getElementById('cfg-cidade').value.trim()))
   atualizarStatusConfigs()
   toast('Dados da loja salvos!')
 }
@@ -4113,7 +4125,7 @@ async function confirmarNovaMesa(){
   var numero=parseInt(document.getElementById('nm-numero').value)||0
   if(!numero){toast('Informe o numero da mesa',1);return}
   var capacidade=parseInt(document.getElementById('nm-capacidade').value)||4
-  var nome=document.getElementById('nm-nome').value.trim()
+  var nome=capitalizarNomeProd(document.getElementById('nm-nome').value.trim())
   await db.from('mesas').insert({numero:numero,capacidade:capacidade,nome:nome||null,status:'livre',cliente_id:meuCid()})
   closeModals()
   toast('Mesa criada!')
@@ -4138,7 +4150,7 @@ function clicarMesa(id){
 async function confirmarAbrirMesa(){
   var m=mesasCache.find(function(x){return x.id===mesaAtualId})
   if(!m)return
-  var cliente=document.getElementById('am-cliente').value.trim()
+  var cliente=capitalizarNomeProd(document.getElementById('am-cliente').value.trim())
   var pessoas=parseInt(document.getElementById('am-pessoas').value)||1
   var obs=document.getElementById('am-obs').value.trim()
   var res=await db.from('comandas').insert({mesa_id:m.id,mesa_numero:m.numero,cliente_nome:cliente||null,pessoas:pessoas,garcom_abertura:userLogado.nome,observacoes:obs||null,status:'aberta',cliente_id:meuCid()}).select().single()
