@@ -87,8 +87,10 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg0);color:
 .topbar-right{display:flex;align-items:center;gap:8px}
 .sec-body{padding:18px 20px;flex:1;overflow-y:auto}
 
-/* Barra de atalhos: fixa no rodape, visivel em qualquer tela do sistema (nao so no PDV) */
-.atalhos-global{position:fixed;left:236px;right:12px;bottom:8px;z-index:500;font-size:11px;color:var(--txt3);background:var(--bg1);border:1px solid var(--border);border-radius:var(--rad);padding:5px 12px;text-align:center;pointer-events:none;user-select:none}
+/* Barra de atalhos: fixa no topo, visivel em qualquer tela do sistema (nao so no PDV).
+   Fica por cima do .main, entao o .main ganha padding-top equivalente pra nada ficar escondido embaixo dela. */
+.atalhos-global{position:fixed;top:0;left:220px;right:0;height:30px;z-index:500;font-size:12px;font-weight:600;color:var(--txt1);background:var(--bg2);border-bottom:1px solid var(--border2);display:flex;align-items:center;justify-content:center;pointer-events:none;user-select:none}
+.main{padding-top:30px}
 @media print{.atalhos-global{display:none!important}}
 
 /* BUTTONS */
