@@ -1337,15 +1337,18 @@ function imprimirViaIframe(html){
 // preview visivel + barra "Imprimir agora"/"Fechar", pra quem esta no caixa decidir se imprime.
 // Nao dispara .print() sozinho (diferente do imprimirViaIframe, que e so pra cupom de cozinha/relatorios).
 function imprimirComPreview(html,tituloBarra){
-  var toolbar='<div class="no-print" style="position:fixed;top:0;left:0;right:0;background:#222;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;z-index:999">'+
-    '<span style="color:#fff;font-size:13px;font-weight:600">&#x1F5A8; '+(tituloBarra||'Pronto para impressao')+'</span>'+
-    '<div style="display:flex;gap:8px">'+
-      '<button onclick="window.print()" style="padding:8px 20px;background:#3ecf8e;color:#000;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer">&#x2705; Imprimir agora</button>'+
-      '<button onclick="window.close()" style="padding:8px 16px;background:#555;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer">Fechar</button>'+
+  // Chrome da janela de preview no mesmo padrao visual do resto do app (cores, fonte, botoes) —
+  // so o CONTEUDO do papel/cupom continua branco/preto de proposito, pra imprimir igual numa impressora de verdade.
+  var toolbar='<div class="no-print" style="position:fixed;top:0;left:0;right:0;background:#13161e;padding:12px 18px;display:flex;align-items:center;justify-content:space-between;z-index:999;border-bottom:1px solid #2e3548;font-family:system-ui,-apple-system,sans-serif;box-shadow:0 4px 24px rgba(0,0,0,.4)">'+
+    '<span style="color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px">&#x1F5A8; '+(tituloBarra||'Pronto para impressao')+'</span>'+
+    '<div style="display:flex;gap:10px">'+
+      '<button onclick="window.close()" style="padding:9px 18px;background:#222736;color:#fff;border:1px solid #3a4260;border-radius:10px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit">Fechar</button>'+
+      '<button onclick="window.print()" style="padding:9px 22px;background:#3ecf8e;color:#0d0f14;border:1px solid #3ecf8e;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">&#x2705; Imprimir agora</button>'+
     '</div>'+
-  '</div><div style="height:46px" class="no-print"></div>'
+  '</div><div style="height:54px" class="no-print"></div>'
+  var fundoPreview='<style>@media screen{html{background:#0d0f14}body{box-shadow:0 8px 40px rgba(0,0,0,.55);margin-left:auto;margin-right:auto}}@media print{.no-print{display:none!important}}</style>'
   var htmlComToolbar=html
-    .replace('<style>','<style>@media print{.no-print{display:none!important}}')
+    .replace('<style>',fundoPreview+'<style>')
     .replace(/<body>/,'<body>'+toolbar)
   if(htmlComToolbar.indexOf('onafterprint')===-1){
     htmlComToolbar=htmlComToolbar.replace('</body>','<script>window.onafterprint=function(){window.close()}<\/script></body>')
@@ -2805,9 +2808,11 @@ document.addEventListener('keydown', function(e){
   if(e.key === 'Escape') closeModals()
 })
 
-// Bloqueia F5/Ctrl+R (atualizar a pagina) sem querer — o app nao salva o carrinho em lugar
-// nenhum, entao atualizar a pagina no meio de uma venda derruba o login e perde o pedido.
+// Bloqueia F5/Ctrl+R (atualizar a pagina) sem querer — mas SO depois de logado (dentro do
+// sistema), pra nao perder um pedido em andamento. Na tela de login (userLogado vazio) o
+// F5/Ctrl+R funciona normal — precisa poder atualizar ali (ex: limpar autofill do navegador).
 document.addEventListener('keydown', function(e){
+  if(!userLogado)return
   if(e.key==='F5'||((e.ctrlKey||e.metaKey)&&(e.key==='r'||e.key==='R'))){
     e.preventDefault()
     toast('Atualizar a pagina fecha o sistema e perde o pedido atual',1)
@@ -3037,14 +3042,14 @@ function imprimirCartaz(promoId, soPreview){
     '.rodape{font-size:11pt;color:#bbb;letter-spacing:3px;margin-top:10px;border-top:1px solid #ddd;padding-top:8px;width:100%}'+
     '@page{size:A4 portrait;margin:10mm}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.no-print{display:none!important}}'+
     '</style></head><body>'+
-    '<div class="no-print" style="position:fixed;top:0;left:0;right:0;background:#222;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;z-index:999">'+
-      '<span style="color:#fff;font-size:14px;font-weight:600">&#x1F5A8; Cartaz pronto para impressao</span>'+
-      '<div style="display:flex;gap:8px">'+
-        '<button onclick="window.print()" style="padding:8px 20px;background:#3ecf8e;color:#000;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer">&#x2705; Imprimir agora</button>'+
-        '<button onclick="window.close()" style="padding:8px 16px;background:#555;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer">Fechar</button>'+
+    '<div class="no-print" style="position:fixed;top:0;left:0;right:0;background:#13161e;padding:12px 18px;display:flex;align-items:center;justify-content:space-between;z-index:999;border-bottom:1px solid #2e3548;font-family:system-ui,-apple-system,sans-serif;box-shadow:0 4px 24px rgba(0,0,0,.4)">'+
+      '<span style="color:#fff;font-size:13px;font-weight:700">&#x1F5A8; Cartaz pronto para impressao</span>'+
+      '<div style="display:flex;gap:10px">'+
+        '<button onclick="window.close()" style="padding:9px 18px;background:#222736;color:#fff;border:1px solid #3a4260;border-radius:10px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit">Fechar</button>'+
+        '<button onclick="window.print()" style="padding:9px 22px;background:#3ecf8e;color:#0d0f14;border:1px solid #3ecf8e;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">&#x2705; Imprimir agora</button>'+
       '</div>'+
     '</div>'+
-    '<div style="height:50px" class="no-print"></div>'+
+    '<div style="height:56px" class="no-print"></div>'+
     '<div class="cartaz">'+
       '<div style="width:100%">'+
         '<div class="topo">&#x2605; '+cfg.topo+' &#x2605;</div>'+
