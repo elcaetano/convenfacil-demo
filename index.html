@@ -1060,7 +1060,7 @@ tr:hover td{background:var(--bg2)}
       </div>
     </div>
     <div class="modal-ft" style="justify-content:center;gap:10px">
-      <button class="btn" onclick="voltarPagamento()">&#x2190; Voltar</button>
+      <button class="btn" onclick="cancelarPagamentoParcial()">&#x2190; Voltar</button>
       <button class="btn grn" id="btn-confirmar-troco" onclick="confirmarTroco()" style="font-size:15px;padding:10px 24px">&#x2713; Confirmar pagamento</button>
     </div>
   </div>
@@ -1083,8 +1083,8 @@ tr:hover td{background:var(--bg2)}
       </div>
     </div>
     <div class="modal-ft">
-      <button class="btn" onclick="closeModals()">Cancelar</button>
-      <button class="btn grn" onclick="closeModals();confirmarPay('PIX')">&#x2713; Confirmar PIX recebido</button>
+      <button class="btn" onclick="cancelarPagamentoParcial()">Cancelar</button>
+      <button class="btn grn" onclick="confirmarRecebimentoPIX()">&#x2713; Confirmar PIX recebido</button>
     </div>
   </div>
 </div>
@@ -3701,8 +3701,10 @@ function validarCPF(input){
 }
 
 // TROCO
-function abrirTroco(){
-  var total = totalParaPagamento()
+// valorOverride: usado pela "Dividir conta" pra calcular troco so da fatia (valor parcial) que
+// essa pessoa especifica esta pagando em dinheiro, em vez do total inteiro da comanda/carrinho.
+function abrirTroco(valorOverride){
+  var total = valorOverride!=null ? valorOverride : totalParaPagamento()
   document.getElementById('troco-total-display').textContent = 'R$ ' + total.toFixed(2)
   document.getElementById('troco-valor-modal').value = ''
   document.getElementById('troco-resultado-wrap').style.display = 'none'
@@ -3713,7 +3715,7 @@ function abrirTroco(){
 }
 
 function calcTrocoModal(){
-  var total = totalParaPagamento()
+  var total = (divisaoEmAndamento&&divisaoLinhaPendente) ? divisaoLinhaPendente.valor : totalParaPagamento()
   var recebido = parseFloat(document.getElementById('troco-valor-modal').value) || 0
   var troco = recebido - total
   var wrapEl = document.getElementById('troco-resultado-wrap')
@@ -3736,11 +3738,42 @@ function calcTrocoModal(){
 }
 
 function confirmarTroco(){
-  var total = totalParaPagamento()
+  var total = (divisaoEmAndamento&&divisaoLinhaPendente) ? divisaoLinhaPendente.valor : totalParaPagamento()
   var recebido = parseFloat(document.getElementById('troco-valor-modal').value) || 0
   if(recebido < total){ toast('Valor insuficiente!', 1); return }
   closeModals()
+  if(divisaoEmAndamento&&divisaoLinhaPendente){
+    empurrarLinhaDivisao(divisaoLinhaPendente)
+    divisaoLinhaPendente=null
+    divisaoEmAndamento=false
+    return
+  }
   confirmarPay('Dinheiro')
+}
+
+// Cancela o PIX/Troco que estava sendo processado pra uma linha da "Dividir conta" e volta
+// pro modal de divisao sem perder o que ja tinha sido adicionado. Fora da divisao, comporta-se
+// como antes (volta pro resumo do pedido ou pro fechamento de mesa).
+function cancelarPagamentoParcial(){
+  closeModals()
+  if(divisaoEmAndamento){
+    divisaoEmAndamento=false
+    divisaoLinhaPendente=null
+    document.getElementById('ov-dividir-pagamento').classList.add('open')
+    return
+  }
+  voltarPagamento()
+}
+
+function confirmarRecebimentoPIX(){
+  closeModals()
+  if(divisaoEmAndamento&&divisaoLinhaPendente){
+    empurrarLinhaDivisao(divisaoLinhaPendente)
+    divisaoLinhaPendente=null
+    divisaoEmAndamento=false
+    return
+  }
+  confirmarPay('PIX')
 }
 
 // RESUMO DO PEDIDO
@@ -3826,9 +3859,11 @@ function pararCameraModal(){
 }
 
 // PIX QR CODE
-function abrirPIX(){
-  if(!mesaPagamentoAtivo && !cart.length){ toast('Adicione produtos ao pedido', 1); return }
-  var total = totalParaPagamento()
+// valorOverride: usado pela "Dividir conta" pra gerar o QR so da fatia (valor parcial) que essa
+// pessoa especifica esta pagando via PIX, em vez do total inteiro da comanda/carrinho.
+function abrirPIX(valorOverride){
+  if(valorOverride==null && !mesaPagamentoAtivo && !cart.length){ toast('Adicione produtos ao pedido', 1); return }
+  var total = valorOverride!=null ? valorOverride : totalParaPagamento()
   document.getElementById('pix-total').textContent = 'R$ ' + total.toFixed(2)
   // Chave PIX salva no localStorage
   var chavePix = localStorage.getItem('chave_pix') || 'convenfacil@NinjAI'
@@ -4214,6 +4249,12 @@ function abrirFecharComanda(){
 // So disponivel no fechamento de mesa (nao no PDV balcao).
 var divisaoPagamentos=[]
 var divisaoTotal=0
+// Quando uma linha da divisao e PIX ou Dinheiro, o valor dela precisa passar pelo modal de
+// verdade (QR code / calculadora de troco) antes de entrar na lista — em vez de so digitar
+// o numero. divisaoEmAndamento sinaliza pra esses modais compartilhados que, ao confirmar,
+// devem voltar pra "Dividir conta" (empurrando a linha) em vez de fechar a comanda inteira.
+var divisaoEmAndamento=false
+var divisaoLinhaPendente=null
 
 function abrirDividirConta(){
   closeModals()
@@ -4255,7 +4296,7 @@ function adicionarLinhaDivisao(){
   if(valor<=0){toast('Informe um valor valido',1);return}
   var falta=divisaoTotal-somaDividido()
   if(valor-falta>0.009){toast('Esse valor passa do que falta (R$ '+falta.toFixed(2)+')',1);return}
-  var linha={metodo:metodo,valor:valor}
+
   if(metodo==='Fiado'){
     var sel=document.getElementById('dp-fiado-cliente')
     var clienteId=sel.value
@@ -4263,12 +4304,36 @@ function adicionarLinhaDivisao(){
     var dataPromessa=document.getElementById('dp-fiado-data').value
     if(!clienteId){toast('Selecione o cliente do fiado',1);return}
     if(!dataPromessa){toast('Informe a data prometida',1);return}
-    linha.clienteId=clienteId
-    linha.clienteNome=clienteNome
-    linha.dataPromessa=dataPromessa
+    empurrarLinhaDivisao({metodo:metodo,valor:valor,clienteId:clienteId,clienteNome:clienteNome,dataPromessa:dataPromessa})
+    return
   }
+
+  // PIX e Dinheiro chamam o modal de verdade (QR code / calculadora de troco) pro valor dessa
+  // fatia especifica, em vez de so aceitar o numero digitado — assim o cliente ve o QR certo
+  // pra pagar e o caixa calcula o troco certo, igual seria numa venda normal.
+  if(metodo==='PIX'){
+    divisaoLinhaPendente={metodo:'PIX',valor:valor}
+    divisaoEmAndamento=true
+    closeModals()
+    abrirPIX(valor)
+    return
+  }
+  if(metodo==='Dinheiro'){
+    divisaoLinhaPendente={metodo:'Dinheiro',valor:valor}
+    divisaoEmAndamento=true
+    abrirTroco(valor)
+    return
+  }
+
+  // Cartao Debito / Cartao Credito: a maquininha e fisica, nao tem modal de processamento —
+  // so confirma o valor direto.
+  empurrarLinhaDivisao({metodo:metodo,valor:valor})
+}
+
+function empurrarLinhaDivisao(linha){
   divisaoPagamentos.push(linha)
   document.getElementById('dp-valor').value=''
+  document.getElementById('ov-dividir-pagamento').classList.add('open')
   renderDivisaoPagamentos()
 }
 
