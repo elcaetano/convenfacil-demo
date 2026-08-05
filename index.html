@@ -636,8 +636,12 @@ tr:hover td{background:var(--bg2)}
         <div class="rel-filter">
           <select id="rel-tipo" onchange="renderRelatorio()">
             <option value="vendas">Vendas por periodo</option>
+            <option value="vendas_forma">Vendas por forma de pagamento</option>
             <option value="mesas">Mesas atendidas</option>
             <option value="pix">Relatorio PIX</option>
+            <option value="abc">Curva ABC de produtos</option>
+            <option value="giro">Giro de estoque (produtos parados)</option>
+            <option value="horario">Mais vendidos por horario</option>
             <option value="pagar">Contas a pagar</option>
             <option value="excecoes">Exceções / Exclusoes</option>
           </select>
@@ -2431,6 +2435,135 @@ async function renderRelatorio(){
       '<div class="tbl"><table><thead><tr><th>Data/Hora</th><th>Forma</th><th>Total</th></tr></thead><tbody>'+
       (vendas.length?vendas.map(function(v){return'<tr><td>'+new Date(v.criado_em).toLocaleString('pt-BR')+'</td><td>'+v.forma_pagamento+'</td><td style="color:var(--green);font-weight:600">R$ '+Number(v.total).toFixed(2)+'</td></tr>'}).join(''):'<tr><td colspan="3"><div class="empty">Nenhuma venda</div></td></tr>')+
       '</tbody></table></div>'
+  } else if(tipo==='vendas_forma'){
+    // Agrupa as vendas do PDV (balcao) por forma de pagamento. Obs: fechamentos de mesa com
+    // "Dividir conta" nao entram aqui separados por forma (o texto salvo e um resumo livre) —
+    // esse relatorio cobre o PDV, que e a maior parte do movimento.
+    var res=await scopeCid(db.from('vendas').select('*')).gte('criado_em',dataInicio)
+    var vendas=res.data||[]
+    var grupos={}
+    vendas.forEach(function(v){
+      var f=v.forma_pagamento||'Outro'
+      if(!grupos[f])grupos[f]={qtd:0,total:0}
+      grupos[f].qtd++
+      grupos[f].total+=Number(v.total)
+    })
+    var totalGeral=vendas.reduce(function(a,v){return a+Number(v.total)},0)
+    var linhas=Object.keys(grupos).sort(function(a,b){return grupos[b].total-grupos[a].total})
+    el.innerHTML='<div class="mc b" style="margin-bottom:16px"><div class="lbl">Total do periodo (PDV)</div><div class="val">R$ '+totalGeral.toFixed(2)+'</div><div class="sub">'+vendas.length+' vendas</div></div>'+
+      '<div class="tbl"><table><thead><tr><th>Forma de pagamento</th><th>Qtd vendas</th><th>Total</th><th>% do periodo</th></tr></thead><tbody>'+
+      (linhas.length?linhas.map(function(f){
+        var g=grupos[f]
+        var pct=totalGeral?((g.total/totalGeral)*100).toFixed(1):'0.0'
+        return'<tr><td>'+f+'</td><td>'+g.qtd+'</td><td style="color:var(--green);font-weight:600">R$ '+g.total.toFixed(2)+'</td><td>'+pct+'%</td></tr>'
+      }).join(''):'<tr><td colspan="4"><div class="empty">Nenhuma venda no periodo</div></td></tr>')+
+      '</tbody></table></div>'
+  } else if(tipo==='abc'){
+    var resV=await scopeCid(db.from('vendas').select('id')).gte('criado_em',dataInicio)
+    var vendaIds=(resV.data||[]).map(function(v){return v.id})
+    var itens=[]
+    if(vendaIds.length){
+      var resI=await scopeCid(db.from('itens_venda').select('produto_id,quantidade,preco_unitario')).in('venda_id',vendaIds)
+      itens=resI.data||[]
+    }
+    var porProduto={}
+    itens.forEach(function(it){
+      if(!it.produto_id)return
+      if(!porProduto[it.produto_id])porProduto[it.produto_id]={qtd:0,fat:0}
+      porProduto[it.produto_id].qtd+=it.quantidade
+      porProduto[it.produto_id].fat+=Number(it.preco_unitario)*it.quantidade
+    })
+    var lista=Object.keys(porProduto).map(function(pid){
+      var p=prods.find(function(x){return x.id===pid})
+      var custoUnit=p?Number(p.preco_custo||0):0
+      var d=porProduto[pid]
+      return{nome:p?p.nome:'Produto removido',qtd:d.qtd,fat:d.fat,lucro:d.fat-(custoUnit*d.qtd)}
+    }).sort(function(a,b){return b.fat-a.fat})
+    var totalFat=lista.reduce(function(a,x){return a+x.fat},0)
+    var acumulado=0
+    lista.forEach(function(x){
+      acumulado+=x.fat
+      x.pctAcum=totalFat?(acumulado/totalFat*100):0
+      x.classe=x.pctAcum<=80?'A':x.pctAcum<=95?'B':'C'
+    })
+    var corClasse={A:'var(--green)',B:'var(--yellow)',C:'var(--red)'}
+    el.innerHTML='<div class="mc b" style="margin-bottom:16px"><div class="lbl">Faturamento total (itens vendidos)</div><div class="val">R$ '+totalFat.toFixed(2)+'</div><div class="sub">'+lista.length+' produtos com venda no periodo &bull; A = ~80% do faturamento, B = ~15%, C = resto</div></div>'+
+      '<div class="tbl"><table><thead><tr><th>Classe</th><th>Produto</th><th>Qtd vendida</th><th>Faturamento</th><th>Lucro estimado</th><th>% acumulado</th></tr></thead><tbody>'+
+      (lista.length?lista.map(function(x){
+        return'<tr><td><b style="color:'+corClasse[x.classe]+'">'+x.classe+'</b></td><td>'+x.nome+'</td><td>'+x.qtd+'</td><td style="font-weight:600">R$ '+x.fat.toFixed(2)+'</td><td style="color:'+(x.lucro>=0?'var(--green)':'var(--red)')+'">R$ '+x.lucro.toFixed(2)+'</td><td>'+x.pctAcum.toFixed(1)+'%</td></tr>'
+      }).join(''):'<tr><td colspan="6"><div class="empty">Nenhuma venda no periodo</div></td></tr>')+
+      '</tbody></table></div>'
+  } else if(tipo==='giro'){
+    // Nao usa o filtro de periodo de proposito: olha o historico inteiro pra achar a ultima venda de cada produto.
+    var resV=await scopeCid(db.from('vendas').select('id,criado_em'))
+    var vendasMap={}
+    ;(resV.data||[]).forEach(function(v){vendasMap[v.id]=v.criado_em})
+    var resI=await scopeCid(db.from('itens_venda').select('produto_id,venda_id'))
+    var ultimaVenda={}
+    ;(resI.data||[]).forEach(function(it){
+      var dt=vendasMap[it.venda_id]
+      if(!dt||!it.produto_id)return
+      if(!ultimaVenda[it.produto_id]||dt>ultimaVenda[it.produto_id])ultimaVenda[it.produto_id]=dt
+    })
+    var hoje=new Date()
+    var lista=prods.map(function(p){
+      var dt=ultimaVenda[p.id]
+      var dias=dt?Math.floor((hoje-new Date(dt))/86400000):null
+      return{nome:p.nome,estoque:p.estoque,valorParado:p.estoque*Number(p.preco_custo||0),dias:dias}
+    }).sort(function(a,b){
+      if(a.dias===null&&b.dias===null)return 0
+      if(a.dias===null)return -1
+      if(b.dias===null)return 1
+      return b.dias-a.dias
+    })
+    var totalParado=lista.reduce(function(a,x){return a+x.valorParado},0)
+    el.innerHTML='<div class="mc r" style="margin-bottom:16px"><div class="lbl">Dinheiro parado em estoque (pelo custo)</div><div class="val">R$ '+totalParado.toFixed(2)+'</div><div class="sub">'+lista.length+' produtos cadastrados &bull; considera todo o historico, nao filtra por periodo</div></div>'+
+      '<div class="tbl"><table><thead><tr><th>Produto</th><th>Estoque atual</th><th>Valor parado (custo)</th><th>Ultima venda</th></tr></thead><tbody>'+
+      (lista.length?lista.map(function(x){
+        var txt=x.dias===null?'Nunca vendido':x.dias+' dias atras'
+        var cor=(x.dias===null||x.dias>30)?'var(--red)':(x.dias>14?'var(--yellow)':'var(--txt2)')
+        return'<tr><td>'+x.nome+'</td><td>'+x.estoque+'</td><td>R$ '+x.valorParado.toFixed(2)+'</td><td style="color:'+cor+';font-weight:600">'+txt+'</td></tr>'
+      }).join(''):'<tr><td colspan="4"><div class="empty">Nenhum produto cadastrado</div></td></tr>')+
+      '</tbody></table></div>'
+  } else if(tipo==='horario'){
+    var resV=await scopeCid(db.from('vendas').select('id,criado_em')).gte('criado_em',dataInicio)
+    var vendas=resV.data||[]
+    var vendaHora={}
+    vendas.forEach(function(v){vendaHora[v.id]=new Date(v.criado_em).getHours()})
+    var vendaIds=vendas.map(function(v){return v.id})
+    var itens=[]
+    if(vendaIds.length){
+      var resI=await scopeCid(db.from('itens_venda').select('produto_id,quantidade,venda_id')).in('venda_id',vendaIds)
+      itens=resI.data||[]
+    }
+    function faixaHorario(h){
+      if(h>=0&&h<6)return'Madrugada (0h-6h)'
+      if(h>=6&&h<12)return'Manha (6h-12h)'
+      if(h>=12&&h<18)return'Tarde (12h-18h)'
+      return'Noite (18h-24h)'
+    }
+    var porFaixa={}
+    itens.forEach(function(it){
+      var h=vendaHora[it.venda_id]
+      if(h===undefined||!it.produto_id)return
+      var f=faixaHorario(h)
+      if(!porFaixa[f])porFaixa[f]={}
+      if(!porFaixa[f][it.produto_id])porFaixa[f][it.produto_id]=0
+      porFaixa[f][it.produto_id]+=it.quantidade
+    })
+    var ordemFaixas=['Madrugada (0h-6h)','Manha (6h-12h)','Tarde (12h-18h)','Noite (18h-24h)']
+    el.innerHTML=ordemFaixas.map(function(f){
+      var dados=porFaixa[f]||{}
+      var top=Object.keys(dados).map(function(pid){
+        var p=prods.find(function(x){return x.id===pid})
+        return{nome:p?p.nome:'Produto removido',qtd:dados[pid]}
+      }).sort(function(a,b){return b.qtd-a.qtd}).slice(0,5)
+      return'<div class="mc" style="margin-bottom:14px"><div class="lbl">'+f+'</div>'+
+        (top.length?'<div class="tbl" style="margin-top:8px"><table><thead><tr><th>Produto</th><th>Qtd vendida</th></tr></thead><tbody>'+
+          top.map(function(t){return'<tr><td>'+t.nome+'</td><td style="font-weight:600">'+t.qtd+'</td></tr>'}).join('')+
+        '</tbody></table></div>':'<div class="empty">Sem vendas nesse horario</div>')+
+      '</div>'
+    }).join('')
   } else if(tipo==='mesas'){
     var res=await scopeCid(db.from('comandas').select('*')).eq('status','fechada').gte('fechada_em',dataInicio).order('fechada_em',{ascending:false})
     var fechadas=res.data||[]
@@ -2468,7 +2601,7 @@ function printRel(){
   if(!el || !el.innerHTML.trim()){ toast('Carregue um relatorio primeiro', 1); return }
   var loja = localStorage.getItem('nome_loja') || 'ConvenFacil'
   var now = new Date().toLocaleString('pt-BR')
-  var titulos = {vendas:'Relatorio de Vendas', mesas:'Relatorio de Mesas Atendidas', pix:'Relatorio PIX', pagar:'Relatorio Contas a Pagar', excecoes:'Relatorio de Excecoes'}
+  var titulos = {vendas:'Relatorio de Vendas', vendas_forma:'Vendas por Forma de Pagamento', mesas:'Relatorio de Mesas Atendidas', pix:'Relatorio PIX', abc:'Curva ABC de Produtos', giro:'Giro de Estoque', horario:'Mais Vendidos por Horario', pagar:'Relatorio Contas a Pagar', excecoes:'Relatorio de Excecoes'}
   var html = '<!DOCTYPE html><html><head><meta charset="UTF-8">'+
     '<style>'+
     'body{font-family:Arial,sans-serif;font-size:12px;color:#000;padding:15px}'+
