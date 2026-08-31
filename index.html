@@ -7,7 +7,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Oswald:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="./styles.css?v=20260831-10">
+<link rel="stylesheet" href="./styles.css?v=20260831-11">
 </head>
 <body>
 
@@ -122,7 +122,7 @@
         <h1>PDV: Caixa</h1>
         <div class="topbar-right">
           <span style="font-size:12px;color:var(--txt3)" id="pdv-info">Carregando...</span>
-          <span class="cash-status" id="pdv-caixa-status">Caixa fechado</span>
+          <span class="cash-status closed" id="pdv-caixa-status">Caixa fechado: abra para iniciar as vendas</span>
           <button class="btn sm grn" id="btn-pdv-abrir" type="button" onclick="abrirModalAberturaCaixa()" title="Informar o valor inicial e abrir o caixa">&#x1F513; Abrir caixa</button>
           <button class="btn sm red" id="btn-pdv-sangria" type="button" onclick="abrirMovimentoCaixa('sangria')" title="Registrar retirada de dinheiro" disabled>&#x2796; Sangria</button>
           <button class="btn sm grn" id="btn-pdv-suprimento" type="button" onclick="abrirMovimentoCaixa('suprimento')" title="Registrar entrada de dinheiro" disabled>&#x2795; Suprimento</button>
@@ -154,8 +154,8 @@
             <div class="ct-row"><span>Desconto</span><span id="desc-val">R$ 0,00</span></div>
             <div class="ct-tot"><span>Total</span><span id="tot">R$ 0,00</span></div>
 
-            <button id="btn-finalizar-venda" onclick="abrirResumoPedido()" disabled style="width:100%;padding:14px;border-radius:var(--rad);border:none;background:linear-gradient(135deg,var(--green),#2ab87a);cursor:pointer;font-size:15px;font-weight:800;color:#000;font-family:inherit;letter-spacing:.5px;margin-bottom:8px;box-shadow:0 0 20px var(--green-glow)">
-              &#x2705; FINALIZAR VENDA
+            <button id="btn-finalizar-venda" class="btn-finalizar-venda cash-closed-action" onclick="abrirResumoPedido()">
+              &#x1F513; ABRIR CAIXA PARA VENDER
             </button>
             <button class="btn grn" id="btn-imprimir-ultimo-recibo" style="width:100%;justify-content:center;margin-bottom:6px" onclick="imprimirUltimoRecibo()" disabled>&#x1F9FE; Imprimir ultimo recibo</button>
             <button class="btn-clear" onclick="clearCart()">&#x1F5D1; Limpar pedido</button>
@@ -1000,6 +1000,6 @@
 
 <div class="toast ok" id="tst"><span class="tic" id="tic">&#x2713;</span><span id="tst-m">ok</span></div>
 
-<script src="./app.js?v=20260831-10"></script>
+<script src="./app.js?v=20260831-11"></script>
 </body>
 </html>

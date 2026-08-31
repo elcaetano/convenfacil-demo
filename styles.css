@@ -196,7 +196,10 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg0);color:
 .pay-btn:hover{background:var(--bg3);border-color:var(--acc);color:var(--acc)}
 .pay-ic{font-size:18px}
 .btn-clear{width:100%;padding:8px;border-radius:var(--rad);border:1px solid rgba(240,82,82,.25);background:var(--red-dim);cursor:pointer;font-size:12px;font-weight:600;color:var(--red);font-family:inherit}
-#btn-finalizar-venda:disabled{opacity:.42;cursor:not-allowed;box-shadow:none!important;filter:grayscale(.35)}
+.btn-finalizar-venda{width:100%;padding:14px;border-radius:var(--rad);border:none;background:linear-gradient(135deg,var(--green),#2ab87a);cursor:pointer;font-size:15px;font-weight:800;color:#000;font-family:inherit;letter-spacing:.5px;margin-bottom:8px;box-shadow:0 0 20px var(--green-glow);transition:.15s}
+.btn-finalizar-venda:hover{filter:brightness(1.06)}
+.btn-finalizar-venda:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.btn-finalizar-venda.cash-closed-action{background:linear-gradient(135deg,var(--acc),#7257d9);color:#fff;box-shadow:0 0 20px var(--acc-glow)}
 
 /* NF MODAL */
 .nf-modal{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}

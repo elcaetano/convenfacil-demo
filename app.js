@@ -1546,12 +1546,17 @@ function atualizarStatusCaixaPdv(){
       status.textContent='Caixa aberto desde '+desde
       status.classList.remove('closed')
     }else{
-      status.textContent='Caixa fechado'
+      status.textContent='Caixa fechado: abra para iniciar as vendas'
       status.classList.add('closed')
     }
   }
   if(botaoAbrir)botaoAbrir.style.display=turnoAtual?'none':'inline-flex'
-  if(botaoFinalizar)botaoFinalizar.disabled=!turnoAtual
+  if(botaoFinalizar){
+    botaoFinalizar.disabled=false
+    botaoFinalizar.classList.toggle('cash-closed-action',!turnoAtual)
+    botaoFinalizar.innerHTML=turnoAtual?'&#x2705; FINALIZAR VENDA':'&#x1F513; ABRIR CAIXA PARA VENDER'
+    botaoFinalizar.title=turnoAtual?'Revisar o pedido e escolher o pagamento':'Informe o valor inicial para liberar as vendas'
+  }
   botoes.forEach(function(id){var el=document.getElementById(id);if(el)el.disabled=!turnoAtual})
 }
 
@@ -2949,11 +2954,11 @@ function confirmarRecebimentoPIX(){
 
 // RESUMO DO PEDIDO
 async function abrirResumoPedido(){
-  if(!cart.length){ toast('Adicione produtos ao pedido', 1); return }
   if(userLogado&&userLogado.nivel!=='superadmin'){
     var caixaAberto=await garantirTurnoCaixaAberto(true)
     if(!caixaAberto)return
   }
+  if(!cart.length){ toast('Adicione produtos ao pedido', 1); return }
   var orig = cart.reduce(function(a,c){ return a + Number(c.preco_venda)*c.qty }, 0)
   var total = cart.reduce(function(a,c){ return a + Number(c.preco_final)*c.qty }, 0)
   var desc = orig - total
