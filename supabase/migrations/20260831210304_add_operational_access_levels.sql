@@ -55,6 +55,9 @@ create index if not exists itens_comanda_lancado_por_usuario_idx
 create index if not exists comissoes_garcom_cliente_criado_idx
   on public.comissoes_garcom (cliente_id, criado_em desc);
 
+create index if not exists comissoes_garcom_usuario_idx
+  on public.comissoes_garcom (usuario_id);
+
 comment on column public.comandas.garcom_abertura_usuario_id is
   'Usuario que abriu a mesa; o nome em garcom_abertura permanece como historico legivel.';
 
