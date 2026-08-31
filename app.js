@@ -212,6 +212,7 @@ async function restaurarSessao(){
 function iniciarApp(){
   document.getElementById('login-wrap').style.display='none'
   document.getElementById('app').classList.add('on')
+  restaurarEstadoSidebar()
   document.getElementById('sf-avatar').textContent=userLogado.nome.charAt(0).toUpperCase()
   document.getElementById('sf-name').textContent=userLogado.nome
   document.getElementById('sf-nivel').textContent=userLogado.nivel==='superadmin'?'Master':userLogado.nivel
@@ -318,27 +319,67 @@ function tick(){
   if(el)el.textContent=n.toLocaleDateString('pt-BR')+' - '+n.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})
 }
 
-// MENU CASCATA
-function toggleGrp(id){
-  var header=document.querySelector('#grp-'+id+' .nav-group-header')
-  var items=document.getElementById('grp-'+id+'-items')
-  if(!header||!items)return
-  var isOpen=items.classList.contains('open')
-  // Accordion: ao abrir um grupo, fecha os outros que estavam abertos.
-  document.querySelectorAll('.nav-items.open').forEach(function(el){if(el!==items)el.classList.remove('open')})
-  document.querySelectorAll('.nav-group-header.open').forEach(function(el){if(el!==header)el.classList.remove('open')})
-  if(isOpen){items.classList.remove('open');header.classList.remove('open')}
-  else{items.classList.add('open');header.classList.add('open')}
+// MENU PRINCIPAL: o grupo fica na lateral e suas opcoes aparecem no topo.
+var grupoPorTela={
+  pdv:'vendas',mesas:'vendas',comanda:'vendas',kds:'vendas',promos:'vendas',clientes:'vendas',
+  prods:'estoque',estoque:'estoque',categorias:'estoque',historicoreposicao:'estoque',listacompras:'estoque',
+  fin:'fin',pagar:'fin',receber:'fin',relatorio:'fin',
+  users:'gestao',config:'gestao',excecoes:'gestao'
 }
 
-function go(id,el){
+function selecionarGrupoMenu(id){
+  document.querySelectorAll('.nav-group-header').forEach(function(el){el.classList.remove('on')})
+  document.querySelectorAll('.context-nav-group').forEach(function(el){el.classList.remove('on')})
+  var header=document.querySelector('#grp-'+id+' .nav-group-header')
+  var submenu=document.getElementById('submenu-'+id)
+  if(header)header.classList.add('on')
+  if(submenu)submenu.classList.add('on')
+  var contextNav=document.getElementById('context-nav')
+  if(contextNav)contextNav.style.display='flex'
+  if(window.innerWidth<=768)fecharMobileSidebar()
+}
+
+function aplicarEstadoSidebar(recolhida){
+  var app=document.getElementById('app')
+  var botao=document.getElementById('sidebar-toggle')
+  if(!app||!botao)return
+  app.classList.toggle('sidebar-collapsed',recolhida)
+  botao.innerHTML=recolhida?'&#x203A;':'&#x2039;'
+  botao.setAttribute('aria-label',recolhida?'Expandir menu lateral':'Recolher menu lateral')
+  botao.title=recolhida?'Expandir menu lateral':'Recolher menu lateral'
+}
+
+function restaurarEstadoSidebar(){
+  var recolhida=false
+  try{recolhida=localStorage.getItem('convenfacil.sidebar.collapsed')==='1'}catch(e){}
+  aplicarEstadoSidebar(recolhida)
+}
+
+function toggleSidebar(){
+  var app=document.getElementById('app')
+  if(!app)return
+  var recolhida=!app.classList.contains('sidebar-collapsed')
+  aplicarEstadoSidebar(recolhida)
+  try{localStorage.setItem('convenfacil.sidebar.collapsed',recolhida?'1':'0')}catch(e){}
+}
+
+async function go(id,el){
+  if(id==='pdv'&&userLogado&&userLogado.nivel!=='superadmin'){
+    var caixaAberto=await garantirTurnoCaixaAberto()
+    if(!caixaAberto)return
+  }
   if(id!=='comanda'&&comandaTimerInterval){clearInterval(comandaTimerInterval);comandaTimerInterval=null}
   if(id!=='comanda')mesaPagamentoAtivo=false
   document.querySelectorAll('.sec').forEach(function(s){s.classList.remove('on')})
-  document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('on')})
+  document.querySelectorAll('.context-nav-item').forEach(function(n){n.classList.remove('on')})
+  var grupo=grupoPorTela[id]
+  var contextNav=document.getElementById('context-nav')
+  if(grupo)selecionarGrupoMenu(grupo)
+  else if(contextNav)contextNav.style.display='none'
   var sec=document.getElementById('sec-'+id)
   if(sec)sec.classList.add('on')
   if(el)el.classList.add('on')
+  if(id==='pdv'&&window.innerWidth<=768)pdvMobileTab('produtos')
   if(id==='estoque')renderEstoque()
   if(id==='listacompras')renderListaCompras()
   if(id==='historicoreposicao')renderHistoricoReposicao()
@@ -1274,56 +1315,92 @@ async function receberConta(id){
 // limitacao do relatorio "Vendas por forma de pagamento": o texto salvo ali e um resumo livre).
 var turnoAtual=null
 var caixaValorEsperado=0
+var verificandoTurnoCaixa=false
+
+async function carregarTurnoAtual(){
+  var res=await scopeCid(db.from('turnos_caixa').select('*')).eq('status','aberto').order('aberto_em',{ascending:false}).limit(1)
+  if(res.error){console.error(res.error);throw res.error}
+  turnoAtual=(res.data&&res.data[0])||null
+  atualizarStatusCaixaPdv()
+  return turnoAtual
+}
+
+function atualizarStatusCaixaPdv(){
+  var status=document.getElementById('pdv-caixa-status')
+  var botoes=['btn-pdv-sangria','btn-pdv-suprimento','btn-pdv-fechar']
+  if(status){
+    if(turnoAtual){
+      var desde=new Date(turnoAtual.aberto_em).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})
+      status.textContent='Caixa aberto desde '+desde
+      status.classList.remove('closed')
+    }else{
+      status.textContent='Caixa fechado'
+      status.classList.add('closed')
+    }
+  }
+  botoes.forEach(function(id){var el=document.getElementById(id);if(el)el.disabled=!turnoAtual})
+}
+
+function abrirModalAberturaCaixa(){
+  var modal=document.getElementById('ov-abrir-caixa')
+  var valor=document.getElementById('abertura-caixa-valor')
+  if(!modal||!valor)return
+  valor.value=''
+  modal.classList.add('open')
+  setTimeout(function(){valor.focus()},80)
+}
+
+function cancelarAberturaCaixa(){
+  var modal=document.getElementById('ov-abrir-caixa')
+  if(modal)modal.classList.remove('open')
+}
+
+async function garantirTurnoCaixaAberto(){
+  if(turnoAtual&&turnoAtual.status==='aberto'){atualizarStatusCaixaPdv();return true}
+  if(verificandoTurnoCaixa)return false
+  verificandoTurnoCaixa=true
+  try{
+    await carregarTurnoAtual()
+    if(turnoAtual)return true
+    selecionarGrupoMenu('vendas')
+    abrirModalAberturaCaixa()
+    return false
+  }catch(e){
+    toast('Nao foi possivel verificar o caixa',1)
+    return false
+  }finally{verificandoTurnoCaixa=false}
+}
 
 async function renderCaixa(){
-  var el=document.getElementById('caixa-content')
-  el.innerHTML='<div class="loading"><div class="spin"></div>Carregando...</div>'
-  var res=await scopeCid(db.from('turnos_caixa').select('*')).eq('status','aberto').order('aberto_em',{ascending:false}).limit(1)
-  turnoAtual=(res.data&&res.data[0])||null
-  if(!turnoAtual){
-    el.innerHTML='<div class="mc" style="max-width:420px">'+
-      '<div class="lbl">Nenhum caixa aberto</div>'+
-      '<p style="font-size:13px;color:var(--txt2);margin:10px 0">Abra o caixa informando o valor inicial (fundo de troco) antes de comecar a vender.</p>'+
-      '<div class="fg"><label>Valor de abertura (R$)</label><input type="number" id="caixa-valor-abertura" placeholder="0,00" step="0.01" min="0"></div>'+
-      '<button class="btn grn" style="width:100%;justify-content:center;margin-top:10px" onclick="confirmarAberturaCaixa()">&#x1F513; Abrir caixa</button>'+
-    '</div>'
-    return
-  }
-  var movRes=await scopeCid(db.from('movimentos_caixa').select('*')).eq('turno_id',turnoAtual.id).order('criado_em',{ascending:false})
-  var movs=movRes.data||[]
-  var sangrias=movs.filter(function(m){return m.tipo==='sangria'}).reduce(function(a,m){return a+Number(m.valor)},0)
-  var suprimentos=movs.filter(function(m){return m.tipo==='suprimento'}).reduce(function(a,m){return a+Number(m.valor)},0)
-  el.innerHTML='<div class="mc g" style="max-width:520px;margin-bottom:16px">'+
-      '<div class="lbl">Caixa aberto</div>'+
-      '<div class="val" style="font-size:16px">Desde '+new Date(turnoAtual.aberto_em).toLocaleString('pt-BR')+'</div>'+
-      '<div class="sub">Aberto por '+turnoAtual.usuario_abertura+' &bull; Valor inicial: R$ '+Number(turnoAtual.valor_abertura).toFixed(2)+'</div>'+
-    '</div>'+
-    '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">'+
-      '<button class="btn red" onclick="abrirMovimentoCaixa(\'sangria\')">&#x2796; Sangria (retirar)</button>'+
-      '<button class="btn grn" onclick="abrirMovimentoCaixa(\'suprimento\')">&#x2795; Suprimento (adicionar)</button>'+
-      '<button class="btn acc" onclick="abrirFecharCaixa()">&#x1F512; Fechar caixa</button>'+
-    '</div>'+
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;max-width:520px">'+
-      '<div class="mc r"><div class="lbl">Sangrias no turno</div><div class="val">R$ '+sangrias.toFixed(2)+'</div></div>'+
-      '<div class="mc g"><div class="lbl">Suprimentos no turno</div><div class="val">R$ '+suprimentos.toFixed(2)+'</div></div>'+
-    '</div>'+
-    '<div class="tbl"><table><thead><tr><th>Quando</th><th>Tipo</th><th>Motivo</th><th>Valor</th><th>Quem</th></tr></thead><tbody>'+
-    (movs.length?movs.map(function(m){
-      return'<tr><td>'+new Date(m.criado_em).toLocaleString('pt-BR')+'</td><td>'+(m.tipo==='sangria'?'&#x2796; Sangria':'&#x2795; Suprimento')+'</td><td>'+(m.motivo||'-')+'</td><td style="font-weight:600">R$ '+Number(m.valor).toFixed(2)+'</td><td>'+(m.usuario_nome||'-')+'</td></tr>'
-    }).join(''):'<tr><td colspan="5"><div class="empty">Nenhuma movimentacao nesse turno</div></td></tr>')+
-    '</tbody></table></div>'
+  await carregarTurnoAtual()
 }
 
 async function confirmarAberturaCaixa(){
-  var valor=parseFloat(document.getElementById('caixa-valor-abertura').value)||0
-  var res=await db.from('turnos_caixa').insert({cliente_id:meuCid(),usuario_abertura:userLogado.nome,valor_abertura:valor,status:'aberto'}).select().single()
-  if(res.error){toast('Erro ao abrir caixa',1);return}
-  toast('Caixa aberto!')
-  renderCaixa()
+  var campo=document.getElementById('abertura-caixa-valor')
+  var valorRaw=campo?campo.value:''
+  var valor=parseFloat(valorRaw)
+  if(valorRaw===''||isNaN(valor)||valor<0){toast('Informe o valor de abertura',1);if(campo)campo.focus();return}
+  var botao=document.getElementById('btn-confirmar-abertura')
+  if(botao){botao.disabled=true;botao.textContent='Abrindo caixa...'}
+  try{
+    var res=await db.from('turnos_caixa').insert({cliente_id:meuCid(),usuario_abertura:userLogado.nome,valor_abertura:valor,status:'aberto'}).select().single()
+    if(res.error){console.error(res.error);toast('Erro ao abrir caixa',1);return}
+    turnoAtual=res.data
+    atualizarStatusCaixaPdv()
+    cancelarAberturaCaixa()
+    toast('Caixa aberto!')
+    await renderCaixa()
+    go('pdv',document.getElementById('nav-pdv'))
+  }catch(e){
+    console.error(e)
+    toast('Erro ao abrir caixa',1)
+  }finally{
+    if(botao){botao.disabled=false;botao.innerHTML='&#x1F513; Abrir e acessar o PDV'}
+  }
 }
 
 function abrirMovimentoCaixa(tipo){
-  if(!turnoAtual){toast('Nenhum caixa aberto',1);return}
+  if(!turnoAtual){abrirModalAberturaCaixa();return}
   document.getElementById('mc-titulo').setAttribute('data-tipo',tipo)
   document.getElementById('mc-titulo').innerHTML=tipo==='sangria'?'&#x2796; Sangria (retirar dinheiro)':'&#x2795; Suprimento (adicionar dinheiro)'
   document.getElementById('mc-valor').value=''
@@ -1337,7 +1414,8 @@ async function confirmarMovimentoCaixa(){
   if(valor<=0){toast('Informe um valor valido',1);return}
   if(!motivo){toast('Informe o motivo',1);return}
   if(!turnoAtual){toast('Nenhum caixa aberto',1);return}
-  await db.from('movimentos_caixa').insert({cliente_id:meuCid(),turno_id:turnoAtual.id,tipo:tipo,valor:valor,motivo:motivo,usuario_nome:userLogado.nome})
+  var res=await db.from('movimentos_caixa').insert({cliente_id:meuCid(),turno_id:turnoAtual.id,tipo:tipo,valor:valor,motivo:motivo,usuario_nome:userLogado.nome})
+  if(res.error){console.error(res.error);toast('Erro ao registrar movimento',1);return}
   registrarExcecao(tipo==='sangria'?'SANGRIA DE CAIXA':'SUPRIMENTO DE CAIXA',motivo+'. Valor: R$ '+valor.toFixed(2),valor)
   closeModals()
   toast(tipo==='sangria'?'Sangria registrada':'Suprimento registrado')
@@ -1345,12 +1423,13 @@ async function confirmarMovimentoCaixa(){
 }
 
 async function abrirFecharCaixa(){
-  if(!turnoAtual)return
+  if(!turnoAtual){abrirModalAberturaCaixa();return}
   var vendasRes=await scopeCid(db.from('vendas').select('total')).eq('forma_pagamento','Dinheiro').gte('criado_em',turnoAtual.aberto_em)
-  var totalVendasDinheiro=(vendasRes.data||[]).reduce(function(a,v){return a+Number(v.total)},0)
   var mesasRes=await scopeCid(db.from('comandas').select('valor_total')).eq('status','fechada').eq('forma_pagamento','Dinheiro').gte('fechada_em',turnoAtual.aberto_em)
-  var totalMesasDinheiro=(mesasRes.data||[]).reduce(function(a,c){return a+Number(c.valor_total||0)},0)
   var movRes=await scopeCid(db.from('movimentos_caixa').select('*')).eq('turno_id',turnoAtual.id)
+  if(vendasRes.error||mesasRes.error||movRes.error){console.error(vendasRes.error||mesasRes.error||movRes.error);toast('Erro ao calcular o fechamento',1);return}
+  var totalVendasDinheiro=(vendasRes.data||[]).reduce(function(a,v){return a+Number(v.total)},0)
+  var totalMesasDinheiro=(mesasRes.data||[]).reduce(function(a,c){return a+Number(c.valor_total||0)},0)
   var movs=movRes.data||[]
   var sangrias=movs.filter(function(m){return m.tipo==='sangria'}).reduce(function(a,m){return a+Number(m.valor)},0)
   var suprimentos=movs.filter(function(m){return m.tipo==='suprimento'}).reduce(function(a,m){return a+Number(m.valor)},0)
@@ -1382,7 +1461,7 @@ async function confirmarFecharCaixa(){
   var informado=parseFloat(informadoRaw)||0
   var dif=informado-caixaValorEsperado
   var obs=document.getElementById('fc-obs').value.trim()
-  await db.from('turnos_caixa').update({
+  var res=await db.from('turnos_caixa').update({
     status:'fechado',
     usuario_fechamento:userLogado.nome,
     valor_informado:informado,
@@ -1391,13 +1470,17 @@ async function confirmarFecharCaixa(){
     fechado_em:new Date().toISOString(),
     observacao:obs||null
   }).eq('id',turnoAtual.id)
+  if(res.error){console.error(res.error);toast('Erro ao fechar o caixa',1);return}
   if(Math.abs(dif)>=0.01){
     registrarExcecao('DIFERENCA NO FECHAMENTO DE CAIXA','Esperado: R$ '+caixaValorEsperado.toFixed(2)+'. Contado: R$ '+informado.toFixed(2)+(obs?'. Observação: '+obs:''),dif)
   }
   closeModals()
   toast('Caixa fechado!')
   turnoAtual=null
-  renderCaixa()
+  atualizarStatusCaixaPdv()
+  await renderCaixa()
+  var pdvAberto=document.getElementById('sec-pdv')
+  if(pdvAberto&&pdvAberto.classList.contains('on')&&!turnoAtual)abrirModalAberturaCaixa()
 }
 
 async function renderRelatorio(){

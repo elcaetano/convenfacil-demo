@@ -8,7 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Oswald:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<link rel="stylesheet" href="./styles.css">
+<link rel="stylesheet" href="./styles.css?v=20260831-5">
 </head>
 <body>
 
@@ -36,61 +36,32 @@
   <div class="sidebar">
     <div class="logo">
       <div class="logo-icon">&#x1F3EA;</div>
-      <div><div class="logo-name">ConvênFácil</div><div class="logo-sub">PDV</div></div>
+      <div class="logo-copy"><div class="logo-name">ConvênFácil</div><div class="logo-sub">PDV</div></div>
     </div>
     <div class="nav-wrap" id="nav-wrap">
       <!-- VENDAS -->
       <div class="nav-group" id="grp-vendas">
-        <div class="nav-group-header" onclick="toggleGrp('vendas')">
-          <span>&#x1F4B2; Vendas</span><span class="arrow">&#x25B6;</span>
-        </div>
-        <div class="nav-items" id="grp-vendas-items">
-          <div class="nav-item on" id="nav-pdv" onclick="go('pdv',this)"><span class="nav-ic">&#x1F6D2;</span><span>PDV / Caixa</span></div>
-          <div class="nav-item" id="nav-caixa" onclick="go('caixa',this)"><span class="nav-ic">&#x1F5C4;</span><span>Turno de Caixa</span></div>
-          <div class="nav-item" id="nav-mesas" onclick="go('mesas',this)" style="display:none"><span class="nav-ic">&#x1F37D;</span><span>Mesas</span></div>
-          <div class="nav-item" id="nav-kds" onclick="go('kds',this)" style="display:none"><span class="nav-ic">&#x1F373;</span><span>Cozinha (KDS)</span></div>
-          <div class="nav-item" id="nav-promos" onclick="go('promos',this)"><span class="nav-ic">&#x1F525;</span><span>Promoções</span></div>
-          <div class="nav-item" id="nav-clientes" onclick="go('clientes',this)"><span class="nav-ic">&#x1F465;</span><span>Clientes</span></div>
-        </div>
+        <button class="nav-group-header on" type="button" onclick="selecionarGrupoMenu('vendas')" title="Vendas" aria-label="Vendas" aria-controls="submenu-vendas">
+          <span class="nav-group-icon">&#x1F4B2;</span><span class="nav-group-label">Vendas</span>
+        </button>
       </div>
       <!-- ESTOQUE -->
       <div class="nav-group" id="grp-estoque">
-        <div class="nav-group-header" onclick="toggleGrp('estoque')">
-          <span>&#x1F4E6; Estoque <span class="badge" id="bdg" style="display:none">0</span></span>
-          <span class="arrow">&#x25B6;</span>
-        </div>
-        <div class="nav-items" id="grp-estoque-items">
-          <div class="nav-item" id="nav-prods" onclick="go('prods',this)"><span class="nav-ic">&#x1F3F7;</span><span>Produtos</span></div>
-          <div class="nav-item" id="nav-add-prod" onclick="go('estoque',document.getElementById('nav-estoque'));openModal('prod')"><span class="nav-ic">&#x2795;</span><span>Adicionar produto</span></div>
-          <div class="nav-item" id="nav-baixa-estragado" onclick="abrirBaixaEstragado()"><span class="nav-ic">&#x1F5D1;</span><span>Baixar estragado</span></div>
-          <div class="nav-item" id="nav-estoque" onclick="go('estoque',this)"><span class="nav-ic">&#x1F4E6;</span><span>Conferir estoque</span></div>
-          <div class="nav-item" id="nav-categorias" onclick="go('categorias',this)"><span class="nav-ic">&#x1F3F7;</span><span>Categorias</span></div>
-          <div class="nav-item" id="nav-historico-reposicao" onclick="go('historicoreposicao',this)"><span class="nav-ic">&#x1F4CB;</span><span>Historico de Reposicao</span></div>
-          <div class="nav-item" id="nav-lista-compras" onclick="go('listacompras',this)"><span class="nav-ic">&#x1F6D2;</span><span>Lista p/ Mercado</span></div>
-        </div>
+        <button class="nav-group-header" type="button" onclick="selecionarGrupoMenu('estoque')" title="Estoque" aria-label="Estoque" aria-controls="submenu-estoque">
+          <span class="nav-group-icon">&#x1F4E6;</span><span class="nav-group-label">Estoque</span><span class="badge" id="bdg" style="display:none">0</span>
+        </button>
       </div>
       <!-- FINANCEIRO -->
       <div class="nav-group" id="grp-fin">
-        <div class="nav-group-header" onclick="toggleGrp('fin')">
-          <span>&#x1F4B0; Financeiro</span><span class="arrow">&#x25B6;</span>
-        </div>
-        <div class="nav-items" id="grp-fin-items">
-          <div class="nav-item" id="nav-fin" onclick="go('fin',this)"><span class="nav-ic">&#x1F4CA;</span><span>Resumo</span></div>
-          <div class="nav-item" id="nav-pagar" onclick="go('pagar',this)"><span class="nav-ic">&#x1F4B8;</span><span>Contas a Pagar</span></div>
-          <div class="nav-item" id="nav-receber" onclick="go('receber',this)"><span class="nav-ic">&#x1F4B0;</span><span>Contas a Receber</span></div>
-          <div class="nav-item" id="nav-relatorio" onclick="go('relatorio',this)"><span class="nav-ic">&#x1F4CB;</span><span>Relatorios</span></div>
-        </div>
+        <button class="nav-group-header" type="button" onclick="selecionarGrupoMenu('fin')" title="Financeiro" aria-label="Financeiro" aria-controls="submenu-fin">
+          <span class="nav-group-icon">&#x1F4B0;</span><span class="nav-group-label">Financeiro</span>
+        </button>
       </div>
       <!-- GESTÃO -->
       <div class="nav-group" id="grp-gestao">
-        <div class="nav-group-header" onclick="toggleGrp('gestao')">
-          <span>&#x2699; Gestao</span><span class="arrow">&#x25B6;</span>
-        </div>
-        <div class="nav-items" id="grp-gestao-items">
-          <div class="nav-item" id="nav-users" onclick="go('users',this)"><span class="nav-ic">&#x1F512;</span><span>Usuarios</span></div>
-          <div class="nav-item" id="nav-config" onclick="go('config',this)"><span class="nav-ic">&#x2699;</span><span>Configurações</span></div>
-          <div class="nav-item" id="nav-excecoes" onclick="go('excecoes',this)" style="color:var(--red)"><span class="nav-ic">&#x26A0;</span><span>Exceções</span></div>
-        </div>
+        <button class="nav-group-header" type="button" onclick="selecionarGrupoMenu('gestao')" title="Gestão" aria-label="Gestão" aria-controls="submenu-gestao">
+          <span class="nav-group-icon">&#x2699;</span><span class="nav-group-label">Gestão</span>
+        </button>
       </div>
     </div>
     <div class="sf">
@@ -99,10 +70,12 @@
         <div><div class="sf-name" id="sf-name">-</div><div class="sf-nivel" id="sf-nivel">-</div></div>
       </div>
       <div class="sf-time" id="relogio"></div>
-      <button class="btn-logout" onclick="doLogout()">&#x1F6AA; Sair</button>
-      <div style="text-align:center;font-size:10px;color:var(--txt3);margin-top:10px">ConvenFácil <span style="opacity:.6">by</span> <a href="https://ninjai.com.br" target="_blank" style="color:var(--txt3);text-decoration:none;font-weight:600">NinjAI</a></div>
+      <button class="btn-logout" type="button" onclick="doLogout()" aria-label="Sair do sistema" title="Sair do sistema"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v10M5.6 5.6a9 9 0 1 0 12.8 0"/></svg></button>
+      <div class="sidebar-brand-footer">ConvenFácil <span style="opacity:.6">by</span> <a href="https://ninjai.com.br" target="_blank" style="color:var(--txt3);text-decoration:none;font-weight:600">NinjAI</a></div>
     </div>
   </div>
+
+  <button class="sidebar-toggle" id="sidebar-toggle" type="button" onclick="toggleSidebar()" aria-label="Recolher menu lateral" title="Recolher menu lateral">&#x2039;</button>
 
   <div class="atalhos-global" title="F2 busca produto | F3 leitor USB | F4 finalizar venda | F6 imprimir cupom | Ctrl+Delete limpar pedido | F10 chama o PDV de qualquer tela">&#x2328; F2 busca &bull; F3 leitor &bull; F4 finalizar &bull; F6 cupom &bull; Ctrl+Del limpar &bull; F10 volta ao PDV (funciona em qualquer tela)</div>
 
@@ -112,12 +85,46 @@
 
   <div class="main">
 
+    <nav class="context-nav" id="context-nav" aria-label="Menu do módulo">
+      <div class="context-nav-group on" id="submenu-vendas">
+        <button class="context-nav-item on" id="nav-pdv" type="button" onclick="go('pdv',this)"><span>&#x1F6D2;</span> PDV / Caixa</button>
+        <button class="context-nav-item" id="nav-mesas" type="button" onclick="go('mesas',this)" style="display:none"><span>&#x1F37D;</span> Mesas</button>
+        <button class="context-nav-item" id="nav-kds" type="button" onclick="go('kds',this)" style="display:none"><span>&#x1F373;</span> Cozinha</button>
+        <button class="context-nav-item" id="nav-promos" type="button" onclick="go('promos',this)"><span>&#x1F525;</span> Promoções</button>
+        <button class="context-nav-item" id="nav-clientes" type="button" onclick="go('clientes',this)"><span>&#x1F465;</span> Clientes</button>
+      </div>
+      <div class="context-nav-group" id="submenu-estoque">
+        <button class="context-nav-item" id="nav-prods" type="button" onclick="go('prods',this)"><span>&#x1F3F7;</span> Produtos</button>
+        <button class="context-nav-item" id="nav-add-prod" type="button" onclick="go('estoque',document.getElementById('nav-estoque'));openModal('prod')"><span>&#x2795;</span> Adicionar produto</button>
+        <button class="context-nav-item" id="nav-baixa-estragado" type="button" onclick="abrirBaixaEstragado()"><span>&#x1F5D1;</span> Baixar estragado</button>
+        <button class="context-nav-item" id="nav-estoque" type="button" onclick="go('estoque',this)"><span>&#x1F4E6;</span> Conferir estoque</button>
+        <button class="context-nav-item" id="nav-categorias" type="button" onclick="go('categorias',this)"><span>&#x1F3F7;</span> Categorias</button>
+        <button class="context-nav-item" id="nav-historico-reposicao" type="button" onclick="go('historicoreposicao',this)"><span>&#x1F4CB;</span> Histórico de reposição</button>
+        <button class="context-nav-item" id="nav-lista-compras" type="button" onclick="go('listacompras',this)"><span>&#x1F6D2;</span> Lista para mercado</button>
+      </div>
+      <div class="context-nav-group" id="submenu-fin">
+        <button class="context-nav-item" id="nav-fin" type="button" onclick="go('fin',this)"><span>&#x1F4CA;</span> Resumo</button>
+        <button class="context-nav-item" id="nav-pagar" type="button" onclick="go('pagar',this)"><span>&#x1F4B8;</span> Contas a pagar</button>
+        <button class="context-nav-item" id="nav-receber" type="button" onclick="go('receber',this)"><span>&#x1F4B0;</span> Contas a receber</button>
+        <button class="context-nav-item" id="nav-relatorio" type="button" onclick="go('relatorio',this)"><span>&#x1F4CB;</span> Relatórios</button>
+      </div>
+      <div class="context-nav-group" id="submenu-gestao">
+        <button class="context-nav-item" id="nav-users" type="button" onclick="go('users',this)"><span>&#x1F512;</span> Usuários</button>
+        <button class="context-nav-item" id="nav-config" type="button" onclick="go('config',this)"><span>&#x2699;</span> Configurações</button>
+        <button class="context-nav-item danger" id="nav-excecoes" type="button" onclick="go('excecoes',this)"><span>&#x26A0;</span> Exceções</button>
+      </div>
+    </nav>
+
     <!-- PDV -->
     <div class="sec" id="sec-pdv">
       <div class="topbar">
         <h1>PDV: Caixa</h1>
         <div class="topbar-right">
           <span style="font-size:12px;color:var(--txt3)" id="pdv-info">Carregando...</span>
+          <span class="cash-status" id="pdv-caixa-status">Caixa fechado</span>
+          <button class="btn sm red" id="btn-pdv-sangria" type="button" onclick="abrirMovimentoCaixa('sangria')" title="Registrar retirada de dinheiro" disabled>&#x2796; Sangria</button>
+          <button class="btn sm grn" id="btn-pdv-suprimento" type="button" onclick="abrirMovimentoCaixa('suprimento')" title="Registrar entrada de dinheiro" disabled>&#x2795; Suprimento</button>
+          <button class="btn sm" id="btn-pdv-fechar" type="button" onclick="abrirFecharCaixa()" title="Fechar o caixa atual" disabled>&#x1F512; Fechar</button>
           <button class="btn sm" onclick="toggleBarcode()" id="btn-barcode" title="Leitor USB de codigo de barras">&#x1F4F0; USB</button>
           <button class="btn sm" onclick="toggleCamera()" id="btn-camera" title="Leitor por camera">&#x1F4F7; Camera</button>
         </div>
@@ -159,14 +166,6 @@
             <button class="btn-clear" onclick="clearCart()">&#x1F5D1; Limpar pedido</button>
           </div>
         </div>
-      </div>
-    </div>
-
-    <!-- TURNO DE CAIXA -->
-    <div class="sec" id="sec-caixa">
-      <div class="topbar"><h1>Turno de Caixa</h1></div>
-      <div class="sec-body">
-        <div id="caixa-content"><div class="loading"><div class="spin"></div>Carregando...</div></div>
       </div>
     </div>
 
@@ -963,6 +962,17 @@
   </div>
 </div>
 
+<!-- ABERTURA OBRIGATORIA DO PDV / CAIXA -->
+<div class="ov" id="ov-abrir-caixa">
+  <div class="modal modal-caixa-abertura">
+    <div class="modal-icon">&#x1F4B5;</div>
+    <h2>Abrir PDV / Caixa</h2>
+    <p class="modal-help">Informe o fundo de troco para iniciar o turno. Depois da abertura, o PDV será liberado.</p>
+    <div class="fg"><label for="abertura-caixa-valor">Valor de abertura (R$)</label><input type="number" id="abertura-caixa-valor" placeholder="0,00" step="0.01" min="0" inputmode="decimal" onkeydown="if(event.key==='Enter')confirmarAberturaCaixa()"></div>
+    <div class="modal-ft"><button class="btn" type="button" onclick="cancelarAberturaCaixa()">Cancelar</button><button class="btn grn" id="btn-confirmar-abertura" type="button" onclick="confirmarAberturaCaixa()">&#x1F513; Abrir e acessar o PDV</button></div>
+  </div>
+</div>
+
 <!-- MODAL SANGRIA/SUPRIMENTO DE CAIXA -->
 <div class="ov" id="ov-movimento-caixa">
   <div class="modal" style="max-width:380px">
@@ -1003,6 +1013,6 @@
 
 <div class="toast ok" id="tst"><span class="tic" id="tic">&#x2713;</span><span id="tst-m">ok</span></div>
 
-<script src="./app.js"></script>
+<script src="./app.js?v=20260831-5"></script>
 </body>
 </html>
