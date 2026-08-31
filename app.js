@@ -147,7 +147,22 @@ const PERMISSOES={
   superadmin:{editar:true,excluir:true,relatorios:true,excecoes:true},
   admin:{editar:true,excluir:true,relatorios:true,excecoes:true},
   gerente:{editar:false,excluir:false,relatorios:true,excecoes:false},
-  operador:{editar:false,excluir:false,relatorios:false,excecoes:false}
+  operador:{editar:false,excluir:false,relatorios:false,excecoes:false},
+  garcom:{editar:false,excluir:false,relatorios:false,excecoes:false},
+  cozinha:{editar:false,excluir:false,relatorios:false,excecoes:false},
+  bar:{editar:false,excluir:false,relatorios:false,excecoes:false}
+}
+
+const TELAS_POR_NIVEL={
+  operador:['pdv'],
+  garcom:['mesas','comanda'],
+  cozinha:['kds'],
+  bar:['bar']
+}
+
+const NOMES_NIVEL={
+  superadmin:'Master',admin:'Administrador',gerente:'Gerente',operador:'Operador de caixa',
+  garcom:'Garçom',cozinha:'Cozinha',bar:'Bar'
 }
 
 function perm(acao){
@@ -201,12 +216,10 @@ async function restaurarSessao(){
 }
 
 async function iniciarApp(){
-  document.getElementById('login-wrap').style.display='none'
-  document.getElementById('app').classList.add('on')
   restaurarEstadoSidebar()
   document.getElementById('sf-avatar').textContent=userLogado.nome.charAt(0).toUpperCase()
   document.getElementById('sf-name').textContent=userLogado.nome
-  document.getElementById('sf-nivel').textContent=userLogado.nivel==='superadmin'?'Master':userLogado.nivel
+  document.getElementById('sf-nivel').textContent=NOMES_NIVEL[userLogado.nivel]||userLogado.nivel
   // O painel que controla todas as lojas (antigo "Super Admin"/"Master 4to") nao tem mais
   // botao proprio no menu — so quem loga como superadmin ve e acessa clicando no proprio perfil.
   var sfUser=document.getElementById('sf-user')
@@ -220,44 +233,61 @@ async function iniciarApp(){
     sfUser.onclick=null
   }
   ajustarMenuPorNivel()
-  ajustarMenuPorFuncionalidades()
-  loadProds();loadPromos()
-  carregarCategorias().then(preencherSelectCategorias)
+  await ajustarMenuPorFuncionalidades()
+  var precisaCatalogo=!['cozinha','bar'].includes(userLogado.nivel)
+  if(precisaCatalogo){
+    await Promise.all([loadProds(),loadPromos()])
+    renderPDV()
+    await carregarCategorias()
+    preencherSelectCategorias()
+  }
   tick();setInterval(tick,30000)
   restaurarRascunhoCart()
   iniciarMonitorInatividade()
   // O turno pertence ao caixa da loja e continua aberto no banco mesmo se o navegador
-  // for fechado. Restaura esse estado antes de decidir qual tela/modal deve aparecer.
-  try{await carregarTurnoAtual()}catch(e){atualizarStatusCaixaPdv()}
+  // for fechado. Restaura esse estado antes de mostrar o sistema, evitando que o PDV
+  // apareca por um instante como fechado e solicite outra abertura.
+  if(nivelPodeAcessarTela('pdv')){
+    try{await carregarTurnoAtual()}catch(e){atualizarStatusCaixaPdv()}
+  }else atualizarStatusCaixaPdv()
+  document.getElementById('login-wrap').style.display='none'
+  document.getElementById('app').classList.add('on')
   // Master nao vende nada, so administra as lojas — entao cai direto no Painel Master.
   // Todo mundo mais (dono da loja, gerente, operador) cai no PDV, que e o trabalho do dia a dia.
-  if(userLogado.nivel==='superadmin')await go('superadmin')
-  else await go('pdv',document.getElementById('nav-pdv'))
+  var telaInicial={superadmin:'superadmin',garcom:'mesas',cozinha:'kds',bar:'bar'}[userLogado.nivel]||'pdv'
+  await go(telaInicial,document.getElementById('nav-'+telaInicial))
 }
 
 var funcsAtivas={}
 async function ajustarMenuPorFuncionalidades(){
   var navMesas=document.getElementById('nav-mesas')
   var navKds=document.getElementById('nav-kds')
+  var navBar=document.getElementById('nav-bar')
   // Superadmin (login master, sem cliente_id) sempre ve os modulos, pra poder testar/conferir qualquer coisa
   if(userLogado.nivel==='superadmin'){
     funcsAtivas={atendimento_mesas:true}
     if(navMesas)navMesas.style.display=''
     if(navKds)navKds.style.display=''
+    if(navBar)navBar.style.display=''
     return
   }
-  if(!userLogado.cliente_id){if(navMesas)navMesas.style.display='none';if(navKds)navKds.style.display='none';return}
+  if(!userLogado.cliente_id){if(navMesas)navMesas.style.display='none';if(navKds)navKds.style.display='none';if(navBar)navBar.style.display='none';return}
   try{
     var res=await db.from('funcionalidades').select('*').eq('cliente_id',userLogado.cliente_id).single()
     funcsAtivas=res.data||{}
   }catch(e){funcsAtivas={}}
-  var mostrar=funcsAtivas.atendimento_mesas?'':'none'
-  if(navMesas)navMesas.style.display=mostrar
-  if(navKds)navKds.style.display=mostrar
+  var moduloAtivo=!!funcsAtivas.atendimento_mesas
+  if(navMesas)navMesas.style.display=moduloAtivo&&nivelPodeAcessarTela('mesas')?'':'none'
+  if(navKds)navKds.style.display=moduloAtivo&&nivelPodeAcessarTela('kds')?'':'none'
+  if(navBar)navBar.style.display=moduloAtivo&&nivelPodeAcessarTela('bar')?'':'none'
 }
 
 function ajustarMenuPorNivel(){
   var nivel=userLogado.nivel
+  ;['grp-vendas','grp-estoque','grp-fin','grp-gestao'].forEach(function(id){
+    var grupo=document.getElementById(id);if(grupo)grupo.style.display=''
+  })
+  document.querySelectorAll('.context-nav-item').forEach(function(item){item.style.display=''})
   // Operador: so PDV
   if(nivel==='operador'){
     ['grp-estoque','grp-fin','grp-gestao'].forEach(function(id){
@@ -269,6 +299,20 @@ function ajustarMenuPorNivel(){
   else if(nivel==='gerente'){
     var elg=document.getElementById('grp-gestao');if(elg)elg.style.display='none'
   }
+  else if(['garcom','cozinha','bar'].includes(nivel)){
+    ;['grp-estoque','grp-fin','grp-gestao'].forEach(function(id){
+      var el=document.getElementById(id);if(el)el.style.display='none'
+    })
+  }
+  var telasPermitidas=TELAS_POR_NIVEL[nivel]
+  if(telasPermitidas)document.querySelectorAll('#submenu-vendas .context-nav-item').forEach(function(item){
+    var tela=item.id.replace(/^nav-/,'')
+    item.style.display=telasPermitidas.includes(tela)?'':'none'
+  })
+  var btnNovaMesa=document.getElementById('btn-nova-mesa')
+  var btnFecharComanda=document.getElementById('btn-fechar-comanda')
+  if(btnNovaMesa)btnNovaMesa.style.display=nivel==='garcom'?'none':''
+  if(btnFecharComanda)btnFecharComanda.style.display=nivel==='garcom'?'none':''
   // Admin e Superadmin: gestao completa visivel (o painel Master, que so o superadmin tem,
   // nao fica mais no menu — acessa clicando no proprio perfil, ver iniciarApp())
 }
@@ -293,6 +337,8 @@ async function doLogout(motivo){
   clearTimeout(inactivityTimer)
   try{await db.auth.signOut({scope:'local'})}catch(e){}
   userLogado=null;cart=[];cartSnapshot=[]
+  turnoAtual=null;carregamentoTurnoAtual=null
+  atualizarStatusCaixaPdv()
   ultimaVendaRecibo=null;pagamentoDinheiroPendente=null;vendaEmProcessamento=false
   atualizarBotaoUltimoRecibo()
   document.getElementById('app').classList.remove('on')
@@ -317,17 +363,24 @@ function tick(){
 
 // MENU PRINCIPAL: o grupo fica na lateral e suas opcoes aparecem no topo.
 var grupoPorTela={
-  pdv:'vendas',mesas:'vendas',comanda:'vendas',kds:'vendas',promos:'vendas',clientes:'vendas',
+  pdv:'vendas',mesas:'vendas',comanda:'vendas',kds:'vendas',bar:'vendas',promos:'vendas',clientes:'vendas',
   prods:'estoque',estoque:'estoque',categorias:'estoque',historicoreposicao:'estoque',listacompras:'estoque',
   fin:'fin',pagar:'fin',receber:'fin',relatorio:'fin',
   users:'gestao',config:'gestao',excecoes:'gestao',superadmin:'gestao'
+}
+
+function nivelPodeAcessarTela(tela){
+  if(!userLogado)return false
+  var telas=TELAS_POR_NIVEL[userLogado.nivel]
+  return !telas||telas.includes(tela)
 }
 
 var nomeGrupoMenu={vendas:'Vendas',estoque:'Estoque',fin:'Financeiro',gestao:'Gestão'}
 
 function abrirGrupoMenu(id){
   if(id==='vendas'){
-    go('pdv',document.getElementById('nav-pdv'))
+    var destino={garcom:'mesas',cozinha:'kds',bar:'bar'}[userLogado&&userLogado.nivel]||'pdv'
+    go(destino,document.getElementById('nav-'+destino))
     return
   }
   selecionarGrupoMenu(id)
@@ -371,6 +424,10 @@ function toggleSidebar(){
 }
 
 async function go(id,el){
+  if(userLogado&&!nivelPodeAcessarTela(id)&&id!=='superadmin'){
+    toast('Seu perfil não tem acesso a esta tela',1)
+    return false
+  }
   if(id==='pdv'&&userLogado){
     var caixaAberto=await garantirTurnoCaixaAberto()
     if(!caixaAberto)return
@@ -403,6 +460,7 @@ async function go(id,el){
   if(id==='excecoes')carregarExcecoes().then(renderExceções)
   if(id==='mesas')renderMesas()
   if(id==='kds')renderKds()
+  if(id==='bar')renderBar()
   if(id==='caixa')renderCaixa()
   // No celular, navegar fecha a gaveta do menu sozinho (senao fica cobrindo a tela nova)
   if(window.innerWidth<=768)fecharMobileSidebar()
@@ -1260,14 +1318,25 @@ async function restock(id){
   }
 }
 
-var CATEGORIAS_PADRAO=['Bebidas','Energeticos','Snacks e Salgadinhos','Chocolates e Doces','Laticinios','Alimentacao Rapida','Tabacaria','Higiene Pessoal','Preservativos','Medicamentos OTC','Limpeza','Eletronicos e Acessorios','Recarga e Servicos','Loteria e Jogos','Outros']
+var CATEGORIAS_PADRAO=['Cozinha','Bar','Bebidas','Energeticos','Snacks e Salgadinhos','Chocolates e Doces','Laticinios','Alimentacao Rapida','Tabacaria','Higiene Pessoal','Preservativos','Medicamentos OTC','Limpeza','Eletronicos e Acessorios','Recarga e Servicos','Loteria e Jogos','Outros']
 var categoriasCache=[]
+
+function destinoCategoriaPadrao(nome){
+  var categoria=normalizarTextoBusca(nome)
+  if(categoria==='cozinha')return'cozinha'
+  if(['bar','bebidas','energeticos','refrigerante','refrigerantes'].includes(categoria))return'bar'
+  return'balcao'
+}
+
+function labelDestinoPreparo(destino){
+  return{cozinha:'Cozinha',bar:'Bar',balcao:'Balcão'}[destino]||'Balcão'
+}
 
 async function carregarCategorias(){
   var res=await scopeCid(db.from('categorias').select('*')).order('nome')
   var lista=res.data||[]
   if(!lista.length){
-    await db.from('categorias').insert(CATEGORIAS_PADRAO.map(function(n){return{nome:n,cliente_id:meuCid()}}))
+    await db.from('categorias').insert(CATEGORIAS_PADRAO.map(function(n){return{nome:n,destino_preparo:destinoCategoriaPadrao(n),cliente_id:meuCid()}}))
     res=await scopeCid(db.from('categorias').select('*')).order('nome')
     lista=res.data||[]
   }
@@ -1276,7 +1345,7 @@ async function carregarCategorias(){
   var usadasEmProdutos=[...new Set(prods.map(function(p){return p.categoria}).filter(Boolean))]
   var faltando=usadasEmProdutos.filter(function(n){return nomesExistentes.indexOf(n)===-1})
   if(faltando.length){
-    await db.from('categorias').insert(faltando.map(function(n){return{nome:n,cliente_id:meuCid()}}))
+    await db.from('categorias').insert(faltando.map(function(n){return{nome:n,destino_preparo:destinoCategoriaPadrao(n),cliente_id:meuCid()}}))
     res=await scopeCid(db.from('categorias').select('*')).order('nome')
     lista=res.data||[]
   }
@@ -1295,21 +1364,25 @@ async function renderCategorias(){
   await carregarCategorias()
   preencherSelectCategorias()
   var tb=document.getElementById('cat-tb')
-  if(!categoriasCache.length){tb.innerHTML='<tr><td colspan="2"><div class="empty">Nenhuma categoria cadastrada</div></td></tr>';return}
+  if(!categoriasCache.length){tb.innerHTML='<tr><td colspan="3"><div class="empty">Nenhuma categoria cadastrada</div></td></tr>';return}
   tb.innerHTML=categoriasCache.map(function(c){
-    return'<tr><td><strong>'+c.nome+'</strong></td>'+
+    return'<tr><td><strong>'+c.nome+'</strong></td><td><select aria-label="Destino de '+c.nome+'" onchange="alterarDestinoCategoria(\''+c.id+'\',this.value)">'+
+      ['balcao','cozinha','bar'].map(function(destino){return'<option value="'+destino+'" '+(c.destino_preparo===destino?'selected':'')+'>'+labelDestinoPreparo(destino)+'</option>'}).join('')+
+      '</select></td>'+
       '<td><button class="btn sm red" onclick="delCategoria(\''+c.id+'\')">Excluir</button></td></tr>'
   }).join('')
 }
 
 function abrirCategoriaRapida(){
   document.getElementById('cat-rapida-nome').value=''
+  document.getElementById('cat-rapida-destino').value='balcao'
   document.getElementById('ov-cat-rapida').classList.add('open')
   setTimeout(function(){document.getElementById('cat-rapida-nome').focus()},100)
 }
 
 async function confirmarCategoriaRapida(){
   var nome=document.getElementById('cat-rapida-nome').value.trim()
+  var destino=document.getElementById('cat-rapida-destino').value
   if(!nome){toast('Informe o nome da categoria',1);return}
   var existe=categoriasCache.find(function(c){return c.nome.toLowerCase()===nome.toLowerCase()})
   if(existe){
@@ -1318,7 +1391,7 @@ async function confirmarCategoriaRapida(){
     toast('Categoria ja existia, selecionada')
     return
   }
-  var res=await db.from('categorias').insert({nome:nome,cliente_id:meuCid()})
+  var res=await db.from('categorias').insert({nome:nome,destino_preparo:destino,cliente_id:meuCid()})
   if(res.error){toast('Erro ao cadastrar categoria',1);return}
   await carregarCategorias()
   preencherSelectCategorias()
@@ -1329,12 +1402,21 @@ async function confirmarCategoriaRapida(){
 
 async function addCategoria(){
   var nome=document.getElementById('cat-nova-nome').value.trim()
+  var destino=document.getElementById('cat-nova-destino').value
   if(!nome){toast('Informe o nome da categoria',1);return}
-  var res=await db.from('categorias').insert({nome:nome,cliente_id:meuCid()})
+  var res=await db.from('categorias').insert({nome:nome,destino_preparo:destino,cliente_id:meuCid()})
   if(res.error){toast('Erro ao cadastrar categoria',1);return}
   document.getElementById('cat-nova-nome').value=''
   toast('Categoria cadastrada!')
   renderCategorias()
+}
+
+async function alterarDestinoCategoria(id,destino){
+  var res=await db.from('categorias').update({destino_preparo:destino}).eq('id',id)
+  if(res.error){toast('Não foi possível alterar o destino',1);renderCategorias();return}
+  var categoria=categoriasCache.find(function(item){return item.id===id})
+  if(categoria)categoria.destino_preparo=destino
+  toast('Pedidos desta categoria irão para '+labelDestinoPreparo(destino))
 }
 
 async function delCategoria(id){
@@ -1957,13 +2039,30 @@ async function renderRelatorio(){
         return'<tr><td>'+new Date(m.criado_em).toLocaleString('pt-BR')+'</td><td>'+(m.tipo==='sangria'?'&#x2796; Sangria':'&#x2795; Suprimento')+'</td><td>'+(m.motivo||'-')+'</td><td style="font-weight:600">R$ '+Number(m.valor).toFixed(2)+'</td><td>'+(m.usuario_nome||'-')+'</td></tr>'
       }).join(''):'<tr><td colspan="5"><div class="empty">Nenhuma sangria/suprimento no periodo</div></td></tr>')+
       '</tbody></table></div>'
+  } else if(tipo==='comissoes_garcom'){
+    var res=await scopeCid(db.from('comissoes_garcom').select('*')).gte('criado_em',dataInicio).order('criado_em',{ascending:false})
+    var comissoes=res.data||[]
+    var porGarcom={}
+    comissoes.forEach(function(c){
+      var chave=c.usuario_id||c.garcom_nome
+      if(!porGarcom[chave])porGarcom[chave]={nome:c.garcom_nome,base:0,valor:0,mesas:0}
+      porGarcom[chave].base+=Number(c.base_calculo||0)
+      porGarcom[chave].valor+=Number(c.valor||0)
+      porGarcom[chave].mesas++
+    })
+    var resumo=Object.keys(porGarcom).map(function(chave){return porGarcom[chave]}).sort(function(a,b){return b.valor-a.valor})
+    var totalComissoes=resumo.reduce(function(a,item){return a+item.valor},0)
+    el.innerHTML='<div class="mc g" style="margin-bottom:16px"><div class="lbl">Comissões no período</div><div class="val">R$ '+totalComissoes.toFixed(2)+'</div><div class="sub">Couvert artístico não entra na base de cálculo</div></div>'+
+      '<div class="tbl"><table><thead><tr><th>Garçom</th><th>Mesas com comissão</th><th>Venda de produtos</th><th>Comissão</th></tr></thead><tbody>'+
+      (resumo.length?resumo.map(function(item){return'<tr><td><strong>'+escaparHtmlRecibo(item.nome)+'</strong></td><td>'+item.mesas+'</td><td>R$ '+item.base.toFixed(2)+'</td><td style="color:var(--green);font-weight:700">R$ '+item.valor.toFixed(2)+'</td></tr>'}).join(''):'<tr><td colspan="4"><div class="empty">Nenhuma comissão no período</div></td></tr>')+
+      '</tbody></table></div>'
   } else if(tipo==='mesas'){
     var res=await scopeCid(db.from('comandas').select('*')).eq('status','fechada').gte('fechada_em',dataInicio).order('fechada_em',{ascending:false})
     var fechadas=res.data||[]
     var total=fechadas.reduce(function(a,c){return a+Number(c.valor_total||0)},0)
     el.innerHTML='<div class="mc b" style="margin-bottom:16px"><div class="lbl">Total em mesas no periodo</div><div class="val">R$ '+total.toFixed(2)+'</div><div class="sub">'+fechadas.length+' mesas atendidas</div></div>'+
-      '<div class="tbl"><table><thead><tr><th>Fechada em</th><th>Mesa</th><th>Cliente</th><th>Garcom</th><th>Forma</th><th>Total</th></tr></thead><tbody>'+
-      (fechadas.length?fechadas.map(function(c){return'<tr><td>'+new Date(c.fechada_em).toLocaleString('pt-BR')+'</td><td>'+c.mesa_numero+'</td><td>'+(c.cliente_nome||'-')+'</td><td>'+(c.garcom_abertura||'-')+'</td><td>'+(c.forma_pagamento||'-')+'</td><td style="color:var(--green);font-weight:600">R$ '+Number(c.valor_total||0).toFixed(2)+'</td></tr>'}).join(''):'<tr><td colspan="6"><div class="empty">Nenhuma mesa atendida no periodo</div></td></tr>')+
+      '<div class="tbl"><table><thead><tr><th>Fechada em</th><th>Mesa</th><th>Cliente</th><th>Garçom</th><th>Consumo</th><th>Couvert</th><th>Forma</th><th>Total</th></tr></thead><tbody>'+
+      (fechadas.length?fechadas.map(function(c){return'<tr><td>'+new Date(c.fechada_em).toLocaleString('pt-BR')+'</td><td>'+c.mesa_numero+'</td><td>'+(c.cliente_nome||'-')+'</td><td>'+(c.garcom_abertura||'-')+'</td><td>R$ '+Number(c.valor_consumo||0).toFixed(2)+'</td><td>R$ '+Number(c.couvert_total||0).toFixed(2)+'</td><td>'+(c.forma_pagamento||'-')+'</td><td style="color:var(--green);font-weight:600">R$ '+Number(c.valor_total||0).toFixed(2)+'</td></tr>'}).join(''):'<tr><td colspan="8"><div class="empty">Nenhuma mesa atendida no periodo</div></td></tr>')+
       '</tbody></table></div>'
   } else if(tipo==='pix'){
     var res=await scopeCid(db.from('vendas').select('*')).eq('forma_pagamento','PIX').gte('criado_em',dataInicio).order('criado_em',{ascending:false})
@@ -1994,7 +2093,7 @@ function printRel(){
   if(!el || !el.innerHTML.trim()){ toast('Carregue um relatorio primeiro', 1); return }
   var loja = localStorage.getItem('nome_loja') || 'ConvenFacil'
   var now = new Date().toLocaleString('pt-BR')
-  var titulos = {vendas:'Relatorio de Vendas', vendas_forma:'Vendas por Forma de Pagamento', fechamento_caixa:'Fechamento de Caixa', sangrias:'Sangrias e Suprimentos', mesas:'Relatorio de Mesas Atendidas', pix:'Relatorio PIX', abc:'Curva ABC de Produtos', giro:'Giro de Estoque', horario:'Mais Vendidos por Horario', pagar:'Relatorio Contas a Pagar', excecoes:'Relatorio de Excecoes'}
+  var titulos = {vendas:'Relatorio de Vendas', vendas_forma:'Vendas por Forma de Pagamento', fechamento_caixa:'Fechamento de Caixa', sangrias:'Sangrias e Suprimentos', mesas:'Relatorio de Mesas Atendidas', comissoes_garcom:'Relatorio de Comissoes de Garcons', pix:'Relatorio PIX', abc:'Curva ABC de Produtos', giro:'Giro de Estoque', horario:'Mais Vendidos por Horario', pagar:'Relatorio Contas a Pagar', excecoes:'Relatorio de Excecoes'}
   var html = '<!DOCTYPE html><html><head><meta charset="UTF-8">'+
     '<style>'+
     'body{font-family:Arial,sans-serif;font-size:12px;color:#000;padding:15px}'+
@@ -2159,20 +2258,33 @@ async function renderUsers(){
   var res=await scopeCid(db.from('usuarios').select('*')).order('nome')
   usersCache=res.data||[]
   var tb=document.getElementById('users-tb')
-  if(!res.data){tb.innerHTML='<tr><td colspan="5"><div class="empty">Erro</div></td></tr>';return}
-  var nl={superadmin:'Master',admin:'Administrador',gerente:'Gerente',operador:'Operador'}
+  if(!res.data){tb.innerHTML='<tr><td colspan="6"><div class="empty">Erro</div></td></tr>';return}
+  var nl=NOMES_NIVEL
   tb.innerHTML=res.data.map(function(u){
     var protegido=u.email==='admin@convenfacil.com.br'||(userLogado&&u.id===userLogado.id)
     return'<tr>'+
       '<td><strong>'+u.nome+'</strong></td>'+
       '<td style="color:var(--txt2)">'+u.email+'</td>'+
       '<td><span class="nivel-badge nivel-'+u.nivel+'">'+(nl[u.nivel]||u.nivel)+'</span></td>'+
+      '<td>'+(u.nivel==='garcom'?'<div style="display:flex;align-items:center;gap:5px"><input type="number" min="0" max="100" step="0.1" value="'+Number(u.comissao_percentual||0)+'" aria-label="Comissão de '+u.nome+'" style="width:72px" onchange="atualizarComissaoGarcom(\''+u.id+'\',this.value)"><span>%</span></div>':'-')+'</td>'+
       '<td><span class="tag '+(u.ativo?'ok':'out')+'">'+(u.ativo?'Ativo':'Inativo')+'</span></td>'+
       '<td style="display:flex;gap:6px">'+
       (protegido?'':'<button class="btn sm '+(u.ativo?'red':'grn')+'" onclick="toggleUser(\''+u.id+'\','+u.ativo+')">'+(u.ativo?'Desativar':'Ativar')+'</button>'+
         '<button class="btn sm red" onclick="delUsuario(\''+u.id+'\')" title="Excluir usuario">&#x1F5D1;</button>')+
       '</td></tr>'
   }).join('')
+}
+
+async function atualizarComissaoGarcom(id,valorInformado){
+  var valor=Math.max(0,Math.min(100,Number(valorInformado)||0))
+  var res=await db.from('usuarios').update({comissao_percentual:valor}).eq('id',id).eq('nivel','garcom')
+  if(res.error){toast('Não foi possível atualizar a comissão',1);renderUsers();return}
+  toast('Comissão atualizada para '+valor.toFixed(2)+'%')
+}
+
+function alternarCampoComissaoUsuario(){
+  var nivel=document.getElementById('nu-nivel').value
+  document.getElementById('nu-comissao-wrap').style.display=nivel==='garcom'?'block':'none'
 }
 
 async function toggleUser(id,ativo){
@@ -2288,7 +2400,7 @@ async function confirmarCriarDono(){
   var email=document.getElementById('sao-email').value.trim()
   var senha=document.getElementById('sao-senha').value
   if(!nome||!email||!senha){toast('Preencha todos os campos',1);return}
-  if(senha.length<6){toast('Senha precisa ter pelo menos 6 caracteres',1);return}
+  if(senha.length<8){toast('A senha precisa ter pelo menos 8 caracteres',1);return}
   try{
     await chamarAdminUsers({action:'create',nome:nome,email:email,password:senha,nivel:'admin',cliente_id:clienteId})
     closeModals()
@@ -2315,6 +2427,12 @@ function openModal(tipo){
   }
   if(tipo==='pagar')document.getElementById('ncp-venc').value=new Date().toISOString().slice(0,10)
   if(tipo==='receber')document.getElementById('ncr-venc').value=new Date().toISOString().slice(0,10)
+  if(tipo==='user'){
+    ;['nu-nome','nu-email','nu-senha'].forEach(function(id){document.getElementById(id).value=''})
+    document.getElementById('nu-nivel').value='operador'
+    document.getElementById('nu-comissao').value='0'
+    alternarCampoComissaoUsuario()
+  }
   var ov=document.getElementById('ov-'+tipo)
   if(ov)ov.classList.add('open')
 }
@@ -2467,10 +2585,11 @@ async function addUser(){
   var email=document.getElementById('nu-email').value.trim()
   var senha=document.getElementById('nu-senha').value
   var nivel=document.getElementById('nu-nivel').value
+  var comissao=nivel==='garcom'?Math.max(0,Math.min(100,Number(document.getElementById('nu-comissao').value)||0)):0
   if(!nome||!email||!senha){toast('Preencha todos os campos',1);return}
-  if(senha.length<6){toast('Senha precisa ter pelo menos 6 caracteres',1);return}
+  if(senha.length<8){toast('A senha precisa ter pelo menos 8 caracteres',1);return}
   try{
-    await chamarAdminUsers({action:'create',nome:nome,email:email,password:senha,nivel:nivel,cliente_id:meuCid()})
+    await chamarAdminUsers({action:'create',nome:nome,email:email,password:senha,nivel:nivel,comissao_percentual:comissao,cliente_id:meuCid()})
     closeModals();renderUsers();toast('Usuario cadastrado!')
   }catch(e){toast(e.message||'Erro ao cadastrar',1)}
 }
@@ -3094,7 +3213,7 @@ function copiarPIX(){
 }
 
 // ============ ATENDIMENTO POR MESAS (modulo, liga/desliga por cliente) ============
-var mesasCache=[], mesaAtualId=null, comandaAtualId=null, itensComandaCache=[], comandaTimerInterval=null
+var mesasCache=[], mesaAtualId=null, comandaAtualId=null, comandaAtualDados=null, itensComandaCache=[], comandaTimerInterval=null
 // Quando true, os mesmos modais de pagamento do PDV (troco/cartao/PIX/fiado) estao sendo
 // reutilizados para fechar a conta de uma mesa em vez de uma venda de balcao (cart).
 // Sempre volta pra false ao sair da tela da comanda (ver go()) e ao finalizar o fechamento.
@@ -3105,9 +3224,21 @@ var mesaPagamentoAtivo=false
 // precisar duplicar a logica de cada um so por causa da origem do valor.
 function totalParaPagamento(){
   if(mesaPagamentoAtivo){
-    return itensComandaCache.filter(function(it){return it.status!=='cancelado'}).reduce(function(a,it){return a+Number(it.preco_unit)*it.qtd},0)
+    return totalGeralComanda()
   }
   return cart.reduce(function(a,c){return a+Number(c.preco_final)*c.qty},0)
+}
+
+function totalConsumoComanda(){
+  return itensComandaCache.filter(function(it){return it.status!=='cancelado'}).reduce(function(a,it){return a+Number(it.preco_unit)*it.qtd},0)
+}
+
+function totalCouvertComanda(){
+  return Number(comandaAtualDados&&comandaAtualDados.couvert_total||0)
+}
+
+function totalGeralComanda(){
+  return totalConsumoComanda()+totalCouvertComanda()
 }
 
 async function renderMesas(){
@@ -3169,6 +3300,7 @@ function clicarMesa(id){
     document.getElementById('am-titulo').innerHTML='&#x1F37D; Abrir mesa '+m.numero
     document.getElementById('am-cliente').value=''
     document.getElementById('am-pessoas').value=1
+    document.getElementById('am-couvert').value='0'
     document.getElementById('am-obs').value=''
     document.getElementById('ov-abrir-mesa').classList.add('open')
   }else{
@@ -3181,8 +3313,11 @@ async function confirmarAbrirMesa(){
   if(!m)return
   var cliente=capitalizarNomeProd(document.getElementById('am-cliente').value.trim())
   var pessoas=parseInt(document.getElementById('am-pessoas').value)||1
+  var couvertPorPessoa=Math.max(0,Number(document.getElementById('am-couvert').value)||0)
+  var couvertTotal=couvertPorPessoa*pessoas
   var obs=document.getElementById('am-obs').value.trim()
-  var res=await db.from('comandas').insert({mesa_id:m.id,mesa_numero:m.numero,cliente_nome:cliente||null,pessoas:pessoas,garcom_abertura:userLogado.nome,observacoes:obs||null,status:'aberta',cliente_id:meuCid()}).select().single()
+  var res=await db.from('comandas').insert({mesa_id:m.id,mesa_numero:m.numero,cliente_nome:cliente||null,pessoas:pessoas,garcom_abertura:userLogado.nome,garcom_abertura_usuario_id:userLogado.id,couvert_por_pessoa:couvertPorPessoa,couvert_total:couvertTotal,observacoes:obs||null,status:'aberta',cliente_id:meuCid()}).select().single()
+  if(res.error||!res.data){console.error(res.error);toast('Não foi possível abrir a mesa',1);return}
   var comanda=res.data
   await db.from('mesas').update({status:'ocupada',garcom_nome:userLogado.nome,comanda_atual_id:comanda.id,aberta_em:new Date().toISOString()}).eq('id',m.id)
   closeModals()
@@ -3196,6 +3331,9 @@ async function abrirComanda(mesaId){
   var m=res.data
   if(!m||!m.comanda_atual_id){toast('Mesa sem comanda aberta',1);return}
   comandaAtualId=m.comanda_atual_id
+  var resComanda=await db.from('comandas').select('*').eq('id',comandaAtualId).single()
+  if(resComanda.error){console.error(resComanda.error);toast('Não foi possível carregar a comanda',1);return}
+  comandaAtualDados=resComanda.data||null
   document.getElementById('comanda-titulo').textContent='Mesa '+m.numero+(m.nome?': '+m.nome:'')
   go('comanda')
   await renderComanda()
@@ -3214,10 +3352,10 @@ async function renderComanda(){
   var res=await db.from('itens_comanda').select('*').eq('comanda_id',comandaAtualId).order('lancado_em')
   itensComandaCache=res.data||[]
   var el=document.getElementById('comanda-itens')
-  if(!itensComandaCache.length){el.innerHTML='<div class="empty">Nenhum item lançado ainda</div>';document.getElementById('comanda-total').textContent='R$ 0,00';return}
   var statusLabel={em_preparo:'Em preparo',pronto:'Pronto',entregue:'Entregue',cancelado:'Cancelado'}
   var statusCor={em_preparo:'var(--yellow)',pronto:'var(--green)',entregue:'var(--txt3)',cancelado:'var(--red)'}
-  el.innerHTML=itensComandaCache.map(function(it){
+  if(!itensComandaCache.length)el.innerHTML='<div class="empty">Nenhum item lançado ainda</div>'
+  else el.innerHTML=itensComandaCache.map(function(it){
     var subtotal=Number(it.preco_unit)*it.qtd
     return '<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)'+(it.status==='cancelado'?';opacity:.5':'')+'">'+
       '<div style="flex:1">'+
@@ -3229,8 +3367,12 @@ async function renderComanda(){
       (it.status!=='cancelado'&&it.status!=='entregue'?'<button class="btn sm red" onclick="cancelarItemSilencioso(\''+it.id+'\')">Cancelar</button>':'')+
     '</div>'
   }).join('')
-  var total=itensComandaCache.filter(function(it){return it.status!=='cancelado'}).reduce(function(a,it){return a+Number(it.preco_unit)*it.qtd},0)
-  document.getElementById('comanda-total').textContent='R$ '+total.toFixed(2)
+  var consumo=totalConsumoComanda()
+  var couvert=totalCouvertComanda()
+  var detalhes=document.getElementById('comanda-resumo-detalhes')
+  detalhes.style.display=couvert>0?'block':'none'
+  detalhes.innerHTML=couvert>0?'<div style="display:flex;justify-content:space-between"><span>Consumo</span><strong>R$ '+consumo.toFixed(2)+'</strong></div><div style="display:flex;justify-content:space-between;margin-top:5px"><span>Couvert artístico</span><strong>R$ '+couvert.toFixed(2)+'</strong></div>':''
+  document.getElementById('comanda-total').textContent='R$ '+(consumo+couvert).toFixed(2)
 }
 
 // Adicionar item na comanda
@@ -3278,18 +3420,28 @@ async function confirmarAddItensComanda(){
   if(!ids.length){toast('Escolha ao menos um item',1);return}
   var linhas=ids.map(function(pid){
     var p=prods.find(function(x){return x.id===pid})
-    return{comanda_id:comandaAtualId,produto_id:pid,produto_nome:p.nome,qtd:addItemComandaTemp[pid],preco_unit:Number(p.preco_venda),status:'em_preparo',origem:'garcom',lancado_por:userLogado.nome,impresso:false,cliente_id:meuCid()}
+    var destino=destinoPreparoProduto(p)
+    return{comanda_id:comandaAtualId,produto_id:pid,produto_nome:p.nome,qtd:addItemComandaTemp[pid],preco_unit:Number(p.preco_venda),status:destino==='balcao'?'entregue':'em_preparo',destino_preparo:destino,origem:'garcom',lancado_por:userLogado.nome,lancado_por_usuario_id:userLogado.id,comissao_percentual:Number(userLogado.comissao_percentual||0),impresso:destino!=='cozinha',cliente_id:meuCid()}
   })
-  await db.from('itens_comanda').insert(linhas)
+  var insercao=await db.from('itens_comanda').insert(linhas)
+  if(insercao.error){console.error(insercao.error);toast('Nao foi possivel registrar o pedido',1);return}
   await db.from('mesas').update({status:'ocupada'}).eq('id',mesaAtualId)
   document.getElementById('ov-add-item-comanda').classList.remove('open')
-  toast('Pedido enviado para a cozinha!')
+  var temCozinha=linhas.some(function(item){return item.destino_preparo==='cozinha'})
+  var temBar=linhas.some(function(item){return item.destino_preparo==='bar'})
+  toast(temCozinha&&temBar?'Pedido enviado para a cozinha e para o bar':temCozinha?'Pedido enviado para a cozinha':temBar?'Pedido enviado para o bar':'Pedido registrado')
   await renderComanda()
-  imprimirItensNovosComanda()
+  if(temCozinha)imprimirItensNovosComanda()
+}
+
+function destinoPreparoProduto(produto){
+  var categoria=normalizarTextoBusca(produto&&produto.categoria)
+  var cadastro=categoriasCache.find(function(item){return normalizarTextoBusca(item.nome)===categoria})
+  return cadastro&&cadastro.destino_preparo?cadastro.destino_preparo:destinoCategoriaPadrao(categoria)
 }
 
 async function imprimirItensNovosComanda(){
-  var res=await db.from('itens_comanda').select('*').eq('comanda_id',comandaAtualId).eq('impresso',false).neq('status','cancelado')
+  var res=await db.from('itens_comanda').select('*').eq('comanda_id',comandaAtualId).eq('destino_preparo','cozinha').eq('impresso',false).neq('status','cancelado')
   var novos=res.data||[]
   if(!novos.length)return
   var m=mesasCache.find(function(x){return x.id===mesaAtualId})
@@ -3327,12 +3479,14 @@ async function cancelarItemSilencioso(itemId){
 // Imprime a comanda como esta agora (conferencia pro cliente ver o que ja consumiu),
 // sem fechar nada nem exigir forma de pagamento — pode imprimir varias vezes se quiser.
 function imprimirConferenciaComanda(){
-  if(!itensComandaCache.length){toast('Nenhum item lançado ainda',1);return}
+  if(!itensComandaCache.length&&!totalCouvertComanda()){toast('Nenhum item lançado ainda',1);return}
   var m=mesasCache.find(function(x){return x.id===mesaAtualId})
   var loja=localStorage.getItem('nome_loja')||'CONVENFACIL'
   var now=new Date()
   var ativos=itensComandaCache.filter(function(it){return it.status!=='cancelado'})
-  var total=ativos.reduce(function(a,it){return a+Number(it.preco_unit)*it.qtd},0)
+  var consumo=ativos.reduce(function(a,it){return a+Number(it.preco_unit)*it.qtd},0)
+  var couvert=totalCouvertComanda()
+  var total=consumo+couvert
   var itensHtml=ativos.map(function(it){
     return '<div style="display:flex;justify-content:space-between"><span>'+it.qtd+'x '+it.produto_nome+'</span><span>R$ '+(Number(it.preco_unit)*it.qtd).toFixed(2)+'</span></div>'
   }).join('')
@@ -3344,7 +3498,7 @@ function imprimirConferenciaComanda(){
     '<div class="c b">CONFERENCIA. MESA '+(m?m.numero:'')+'</div>'+
     '<div class="c" style="font-size:10px">Nao e recibo, so conferencia do pedido</div>'+
     '<div class="c">'+now.toLocaleString('pt-BR')+'</div>'+
-    '<div class="linha"></div>'+itensHtml+'<div class="linha"></div>'+
+    '<div class="linha"></div>'+itensHtml+(couvert>0?'<div style="display:flex;justify-content:space-between"><span>Couvert artistico</span><span>R$ '+couvert.toFixed(2)+'</span></div>':'')+'<div class="linha"></div>'+
     '<div style="display:flex;justify-content:space-between" class="b g"><span>TOTAL:</span><span>R$ '+total.toFixed(2)+'</span></div>'+
     '<div class="linha"></div>'+
     '<div class="c" style="font-size:10px">ConvenFacil - convenfacil.com.br</div>'+
@@ -3360,7 +3514,7 @@ async function pedirContaMesa(){
 
 // Fechar comanda
 function abrirFecharComanda(){
-  var total=itensComandaCache.filter(function(it){return it.status!=='cancelado'}).reduce(function(a,it){return a+Number(it.preco_unit)*it.qtd},0)
+  var total=totalGeralComanda()
   if(!total){toast('Nao ha itens para fechar',1);return}
   document.getElementById('fc-total').textContent='R$ '+total.toFixed(2)
   document.getElementById('ov-fechar-comanda').classList.add('open')
@@ -3497,10 +3651,15 @@ async function confirmarDivisaoConta(){
 }
 
 async function finalizarFechamentoComandaDividida(pagamentos){
-  var total=totalParaPagamento()
+  var consumo=totalConsumoComanda()
+  var couvert=totalCouvertComanda()
+  var total=consumo+couvert
   var resumo=pagamentos.map(function(p){return p.metodo+(p.clienteNome?' ('+p.clienteNome+')':'')+' R$ '+p.valor.toFixed(2)}).join(' + ')
   var descricao='Dividido: '+resumo
-  await db.from('comandas').update({status:'fechada',forma_pagamento:descricao,valor_total:total,fechada_em:new Date().toISOString()}).eq('id',comandaAtualId)
+  var fechamento=await db.from('comandas').update({status:'fechada',forma_pagamento:descricao,valor_consumo:consumo,couvert_total:couvert,valor_total:total,fechada_em:new Date().toISOString()}).eq('id',comandaAtualId)
+  if(fechamento.error){toast('Não foi possível fechar a conta',1);return}
+  await registrarComissoesComanda()
+  await concluirItensPendentesComanda()
   await db.from('mesas').update({status:'livre',garcom_nome:null,comanda_atual_id:null,aberta_em:null}).eq('id',mesaAtualId)
   for(var i=0;i<pagamentos.length;i++){
     var p=pagamentos[i]
@@ -3542,7 +3701,7 @@ function imprimirFechamentoComandaDividida(pagamentos,total){
     '<div class="c b" style="font-size:14px">'+loja+'</div>'+
     '<div class="c">'+now.toLocaleDateString('pt-BR')+' '+now.toLocaleTimeString('pt-BR')+'</div>'+
     '<div class="linha"></div><div class="c b">MESA '+(m?m.numero:'')+': FECHAMENTO (CONTA DIVIDIDA)</div><div class="linha"></div>'+
-    itensHtml+'<div class="linha"></div>'+
+    itensHtml+(totalCouvertComanda()>0?'<div style="display:flex;justify-content:space-between"><span>Couvert artistico</span><span>R$ '+totalCouvertComanda().toFixed(2)+'</span></div>':'')+'<div class="linha"></div>'+
     '<div style="display:flex;justify-content:space-between" class="b g"><span>TOTAL:</span><span>R$ '+total.toFixed(2)+'</span></div>'+
     '<div class="linha"></div><div class="b" style="margin-bottom:2px">Pagamento dividido:</div>'+pagsHtml+
     '<div class="linha"></div><div class="c" style="font-size:10px">'+rodape+'</div>'+
@@ -3554,8 +3713,13 @@ function imprimirFechamentoComandaDividida(pagamentos,total){
 // foi concluido — chamado por abrirConfirmar() quando mesaPagamentoAtivo esta ligado.
 // Nunca mexe em vendas/itens_venda (isso e so do balcao); fechamento de mesa usa comandas/mesas.
 async function finalizarFechamentoComanda(metodo){
-  var total=totalParaPagamento()
-  await db.from('comandas').update({status:'fechada',forma_pagamento:metodo,valor_total:total,fechada_em:new Date().toISOString()}).eq('id',comandaAtualId)
+  var consumo=totalConsumoComanda()
+  var couvert=totalCouvertComanda()
+  var total=consumo+couvert
+  var fechamento=await db.from('comandas').update({status:'fechada',forma_pagamento:metodo,valor_consumo:consumo,couvert_total:couvert,valor_total:total,fechada_em:new Date().toISOString()}).eq('id',comandaAtualId)
+  if(fechamento.error){toast('Não foi possível fechar a conta',1);return}
+  await registrarComissoesComanda()
+  await concluirItensPendentesComanda()
   await db.from('mesas').update({status:'livre',garcom_nome:null,comanda_atual_id:null,aberta_em:null}).eq('id',mesaAtualId)
   if(metodo.indexOf('Fiado')===0&&payClienteFiado){
     await db.from('contas_receber').insert({
@@ -3592,7 +3756,7 @@ function imprimirFechamentoComanda(metodo,total){
     '<div class="c b" style="font-size:14px">'+loja+'</div>'+
     '<div class="c">'+now.toLocaleDateString('pt-BR')+' '+now.toLocaleTimeString('pt-BR')+'</div>'+
     '<div class="linha"></div><div class="c b">MESA '+(m?m.numero:'')+': FECHAMENTO</div><div class="linha"></div>'+
-    itensHtml+'<div class="linha"></div>'+
+    itensHtml+(totalCouvertComanda()>0?'<div style="display:flex;justify-content:space-between"><span>Couvert artistico</span><span>R$ '+totalCouvertComanda().toFixed(2)+'</span></div>':'')+'<div class="linha"></div>'+
     '<div style="display:flex;justify-content:space-between" class="b g"><span>TOTAL:</span><span>R$ '+total.toFixed(2)+'</span></div>'+
     '<div style="display:flex;justify-content:space-between"><span>Pagamento:</span><span>'+metodo+'</span></div>'+
     '<div class="linha"></div><div class="c" style="font-size:10px">'+rodape+'</div>'+
@@ -3601,22 +3765,56 @@ function imprimirFechamentoComanda(metodo,total){
   imprimirComPreview(html,'Recibo da mesa pronto para impressao')
 }
 
-// KDS — painel da cozinha
-async function renderKds(){
+async function registrarComissoesComanda(){
+  var porGarcom={}
+  itensComandaCache.filter(function(item){return item.status!=='cancelado'&&item.lancado_por_usuario_id}).forEach(function(item){
+    var id=item.lancado_por_usuario_id
+    if(!porGarcom[id])porGarcom[id]={comanda_id:comandaAtualId,usuario_id:id,garcom_nome:item.lancado_por||'Garçom',base_calculo:0,valor:0,cliente_id:meuCid()}
+    var subtotal=Number(item.preco_unit)*Number(item.qtd)
+    var percentual=Number(item.comissao_percentual||0)
+    porGarcom[id].base_calculo+=subtotal
+    porGarcom[id].valor+=subtotal*percentual/100
+  })
+  var linhas=Object.keys(porGarcom).map(function(id){
+    var linha=porGarcom[id]
+    linha.percentual=linha.base_calculo?linha.valor/linha.base_calculo*100:0
+    linha.base_calculo=Number(linha.base_calculo.toFixed(2))
+    linha.percentual=Number(linha.percentual.toFixed(2))
+    linha.valor=Number(linha.valor.toFixed(2))
+    return linha
+  }).filter(function(linha){return linha.percentual>0})
+  if(!linhas.length)return
+  var res=await db.from('comissoes_garcom').upsert(linhas,{onConflict:'comanda_id,usuario_id'})
+  if(res.error)console.error(res.error)
+}
+
+async function concluirItensPendentesComanda(){
+  if(!comandaAtualId)return
+  await db.from('itens_comanda').update({status:'entregue'}).eq('comanda_id',comandaAtualId).in('status',['em_preparo','pronto'])
+}
+
+// Paineis de preparo: o garcom lanca pelo celular e a categoria do produto
+// direciona automaticamente o pedido para Cozinha ou Bar.
+async function renderPainelPreparo(destino,gridId){
   iniciarRealtimeMesas()
-  var res=await scopeCid(db.from('itens_comanda').select('*')).in('status',['em_preparo','pronto']).order('lancado_em')
+  var res=await scopeCid(db.from('itens_comanda').select('*')).eq('destino_preparo',destino).in('status',['em_preparo','pronto']).order('lancado_em')
   var itens=res.data||[]
-  var grid=document.getElementById('kds-grid')
-  if(!itens.length){grid.innerHTML='<div class="empty">Nenhum pedido em producao</div>';return}
+  var grid=document.getElementById(gridId)
+  var nomeDestino=destino==='cozinha'?'cozinha':'bar'
+  if(res.error){console.error(res.error);grid.innerHTML='<div class="empty">Nao foi possivel carregar os pedidos</div>';return}
+  if(!itens.length){grid.innerHTML='<div class="empty">Nenhum pedido para '+nomeDestino+'</div>';return}
   var porComanda={}
   itens.forEach(function(it){
     if(!porComanda[it.comanda_id])porComanda[it.comanda_id]=[]
     porComanda[it.comanda_id].push(it)
   })
   var comandaIds=Object.keys(porComanda)
-  var resComandas=await db.from('comandas').select('*').in('id',comandaIds)
+  var resComandas=await scopeCid(db.from('comandas').select('*')).in('id',comandaIds).eq('status','aberta')
+  if(resComandas.error){console.error(resComandas.error);grid.innerHTML='<div class="empty">Não foi possível carregar as mesas</div>';return}
   var comandasMap={}
   ;(resComandas.data||[]).forEach(function(c){comandasMap[c.id]=c})
+  comandaIds=comandaIds.filter(function(cid){return!!comandasMap[cid]})
+  if(!comandaIds.length){grid.innerHTML='<div class="empty">Nenhum pedido para '+nomeDestino+'</div>';return}
   grid.innerHTML=comandaIds.map(function(cid){
     var itensDaComanda=porComanda[cid]
     var c=comandasMap[cid]
@@ -3628,12 +3826,14 @@ async function renderKds(){
         '<div style="font-size:11px;color:var(--txt3)">'+tempo+'</div>'+
       '</div>'+
       itensDaComanda.map(function(it){
+        var componentes=destino==='cozinha'&&normalizarTextoBusca(it.produto_nome).indexOf('jantinha')>-1?'<div style="font-size:11px;color:var(--txt2);margin-top:4px">Espeto, mandioca, vinagrete e arroz</div>':''
         return '<div style="padding:8px 0;border-bottom:1px solid var(--border)">'+
-          '<div style="font-size:13px;font-weight:600">'+it.qtd+'x '+it.produto_nome+'</div>'+
-          (it.observacoes?'<div style="font-size:11px;color:var(--txt3)">'+it.observacoes+'</div>':'')+
+          '<div style="font-size:13px;font-weight:600">'+it.qtd+'x '+escaparHtmlRecibo(it.produto_nome)+'</div>'+componentes+
+          (it.lancado_por?'<div style="font-size:10px;color:var(--txt3);margin-top:4px">Pedido por '+escaparHtmlRecibo(it.lancado_por)+'</div>':'')+
+          (it.observacoes?'<div style="font-size:11px;color:var(--txt3)">'+escaparHtmlRecibo(it.observacoes)+'</div>':'')+
           '<div style="display:flex;gap:6px;margin-top:6px">'+
-            (it.status==='em_preparo'?'<button class="btn sm grn" onclick="avancarStatusItemKds(\''+it.id+'\',\'pronto\')">&#x2705; Marcar pronto</button>':'')+
-            (it.status==='pronto'?'<button class="btn sm" onclick="avancarStatusItemKds(\''+it.id+'\',\'entregue\')">&#x2714; Marcar entregue</button>':'')+
+            (it.status==='em_preparo'?'<button class="btn sm grn" onclick="avancarStatusItemKds(\''+it.id+'\',\'pronto\',\''+destino+'\')">&#x2705; Marcar pronto</button>':'')+
+            (it.status==='pronto'?'<button class="btn sm" onclick="avancarStatusItemKds(\''+it.id+'\',\'entregue\',\''+destino+'\')">&#x2714; Marcar entregue</button>':'')+
           '</div>'+
         '</div>'
       }).join('')+
@@ -3641,9 +3841,12 @@ async function renderKds(){
   }).join('')
 }
 
-async function avancarStatusItemKds(itemId,novoStatus){
+function renderKds(){return renderPainelPreparo('cozinha','kds-grid')}
+function renderBar(){return renderPainelPreparo('bar','bar-grid')}
+
+async function avancarStatusItemKds(itemId,novoStatus,destino){
   await db.from('itens_comanda').update({status:novoStatus}).eq('id',itemId)
-  renderKds()
+  if(destino==='bar')renderBar();else renderKds()
   var secComanda=document.getElementById('sec-comanda')
   if(mesaAtualId&&secComanda&&secComanda.classList.contains('on'))renderComanda()
 }
@@ -3660,8 +3863,10 @@ function iniciarRealtimeMesas(){
     })
     .on('postgres_changes',{event:'*',schema:'public',table:'itens_comanda'},function(){
       var secKds=document.getElementById('sec-kds')
+      var secBar=document.getElementById('sec-bar')
       var secComanda=document.getElementById('sec-comanda')
       if(secKds&&secKds.classList.contains('on'))renderKds()
+      if(secBar&&secBar.classList.contains('on'))renderBar()
       if(secComanda&&secComanda.classList.contains('on'))renderComanda()
     })
     .subscribe()

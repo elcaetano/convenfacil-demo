@@ -3,7 +3,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2"
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-const ALLOWED_LEVELS = new Set(["operador", "gerente", "admin", "superadmin"])
+const ALLOWED_LEVELS = new Set(["operador", "garcom", "cozinha", "bar", "gerente", "admin", "superadmin"])
 
 const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
@@ -77,8 +77,12 @@ Deno.serve(async (req: Request) => {
     const email = String(body.email || "").trim().toLowerCase()
     const password = String(body.password || "")
     const nome = String(body.nome || "").trim()
+    const comissaoPercentual = nivelAlvo === "garcom" ? Number(body.comissao_percentual || 0) : 0
     if (!email || !password || !nome) return json({ error: "Dados incompletos" }, 400)
     if (password.length < 8) return json({ error: "A senha deve ter pelo menos 8 caracteres" }, 400)
+    if (!Number.isFinite(comissaoPercentual) || comissaoPercentual < 0 || comissaoPercentual > 100) {
+      return json({ error: "Comissão inválida" }, 400)
+    }
 
     const { data: created, error: createErr } = await admin.auth.admin.createUser({
       email,
@@ -94,6 +98,7 @@ Deno.serve(async (req: Request) => {
       email,
       senha: "",
       nivel: nivelAlvo,
+      comissao_percentual: comissaoPercentual,
       ativo: true,
       cliente_id: clienteIdAlvo,
     })

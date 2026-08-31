@@ -93,7 +93,7 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg0);color:
 .sf-name{font-size:12px;font-weight:600}
 .sf-nivel{font-size:10px;color:var(--txt3);text-transform:uppercase;letter-spacing:.3px}
 .sf-time{font-size:11px;color:var(--txt3);margin-bottom:6px}
-.btn-logout{width:34px;height:34px;padding:0;border-radius:9px;border:1px solid rgba(240,82,82,.25);background:var(--red-dim);cursor:pointer;color:var(--red);font-family:inherit;display:flex;align-items:center;justify-content:center;margin-left:auto}
+.btn-logout{width:34px;height:34px;padding:0;border-radius:9px;border:1px solid rgba(240,82,82,.25);background:var(--red-dim);cursor:pointer;color:var(--red);font-family:inherit;display:flex;align-items:center;justify-content:center;margin:0 auto}
 .btn-logout:hover{background:rgba(240,82,82,.2)}
 .btn-logout:focus-visible{background:rgba(240,82,82,.2);outline:2px solid var(--red);outline-offset:1px}
 .btn-logout svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
@@ -332,6 +332,9 @@ tr:hover td{background:var(--bg2)}
 .nivel-admin{background:var(--acc-dim);color:var(--acc);border:1px solid rgba(79,142,247,.3)}
 .nivel-gerente{background:rgba(62,207,142,.1);color:var(--green);border:1px solid rgba(62,207,142,.25)}
 .nivel-operador{background:var(--bg3);color:var(--txt2);border:1px solid var(--border2)}
+.nivel-garcom{background:var(--acc-dim);color:var(--acc);border:1px solid rgba(79,142,247,.3)}
+.nivel-cozinha{background:rgba(245,183,66,.12);color:var(--yellow);border:1px solid rgba(245,183,66,.3)}
+.nivel-bar{background:rgba(167,139,250,.14);color:var(--purple);border:1px solid rgba(167,139,250,.3)}
 
 /* MODAL */
 .ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:100;align-items:center;justify-content:center;backdrop-filter:blur(4px);cursor:pointer}
