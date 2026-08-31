@@ -163,17 +163,6 @@ async function carregarPerfilLogado(authUser){
   return data
 }
 
-function togglePassword(){
-  const input=document.getElementById('login-senha')
-  const btn=document.getElementById('password-toggle')
-  const mostrar=input.type==='password'
-  input.type=mostrar?'text':'password'
-  btn.setAttribute('aria-pressed',String(mostrar))
-  btn.setAttribute('aria-label',mostrar?'Ocultar senha':'Mostrar senha')
-  btn.title=mostrar?'Ocultar senha':'Mostrar senha'
-  input.focus()
-}
-
 async function doLogin(event){
   if(event)event.preventDefault()
   const email=document.getElementById('login-email').value.trim()
@@ -324,7 +313,7 @@ var grupoPorTela={
   pdv:'vendas',mesas:'vendas',comanda:'vendas',kds:'vendas',promos:'vendas',clientes:'vendas',
   prods:'estoque',estoque:'estoque',categorias:'estoque',historicoreposicao:'estoque',listacompras:'estoque',
   fin:'fin',pagar:'fin',receber:'fin',relatorio:'fin',
-  users:'gestao',config:'gestao',excecoes:'gestao'
+  users:'gestao',config:'gestao',excecoes:'gestao',superadmin:'gestao'
 }
 
 function selecionarGrupoMenu(id){

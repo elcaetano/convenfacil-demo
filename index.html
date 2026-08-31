@@ -8,7 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Oswald:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<link rel="stylesheet" href="./styles.css?v=20260831-5">
+<link rel="stylesheet" href="./styles.css?v=20260831-6">
 </head>
 <body>
 
@@ -24,7 +24,7 @@
     <form id="login-form" onsubmit="doLogin(event)" novalidate>
       <div class="login-err" id="login-err" role="alert" aria-live="polite"></div>
       <div class="fg"><label for="login-email">E-mail</label><input type="email" id="login-email" placeholder="seu@email.com" autocomplete="username" inputmode="email" required></div>
-      <div class="fg"><label for="login-senha">Senha</label><div class="password-wrap"><input type="password" id="login-senha" placeholder="••••••••" autocomplete="current-password" required><button class="password-toggle" type="button" id="password-toggle" onclick="togglePassword()" aria-label="Mostrar senha" aria-pressed="false" title="Mostrar senha">&#x1F441;</button></div></div>
+      <div class="fg"><label for="login-senha">Senha</label><input type="password" id="login-senha" placeholder="••••••••" autocomplete="current-password" required></div>
       <button class="btn-login" type="submit" id="btn-login-do">Entrar no sistema</button>
     </form>
     <div class="login-footer">ConvênFácil &copy; 2026. Desenvolvido por <a href="https://ninjai.com.br" target="_blank" rel="noopener noreferrer"><img src="https://www.ninjai.com.br/ninjai-logo.png" alt="NinjAI" style="height:16px;vertical-align:middle;opacity:.7;transition:.2s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.7"></a></div>
@@ -76,8 +76,6 @@
   </div>
 
   <button class="sidebar-toggle" id="sidebar-toggle" type="button" onclick="toggleSidebar()" aria-label="Recolher menu lateral" title="Recolher menu lateral">&#x2039;</button>
-
-  <div class="atalhos-global" title="F2 busca produto | F3 leitor USB | F4 finalizar venda | F6 imprimir cupom | Ctrl+Delete limpar pedido | F10 chama o PDV de qualquer tela">&#x2328; F2 busca &bull; F3 leitor &bull; F4 finalizar &bull; F6 cupom &bull; Ctrl+Del limpar &bull; F10 volta ao PDV (funciona em qualquer tela)</div>
 
   <!-- MODO MOBILE: botao hamburger fixo (abre/fecha o menu lateral) + overlay escuro -->
   <button class="mobile-menu-btn" onclick="toggleMobileSidebar()" title="Menu">&#9776;</button>
@@ -145,6 +143,7 @@
       </div>
       <div class="pdv-layout">
         <div class="pdv-left" id="pdv-left">
+          <div class="atalhos-global" title="F2 busca produto | F3 leitor USB | F4 finalizar venda | F6 imprimir cupom | Ctrl+Delete limpar pedido | F10 chama o PDV de qualquer tela">&#x2328; F2 busca &bull; F3 leitor &bull; F4 finalizar &bull; F6 cupom &bull; Ctrl+Del limpar &bull; F10 volta ao PDV</div>
           <div class="search-box">
             <input class="search-input" type="text" id="srch" placeholder="Buscar produto..." oninput="filterProds()">
           </div>
@@ -1013,6 +1012,6 @@
 
 <div class="toast ok" id="tst"><span class="tic" id="tic">&#x2713;</span><span id="tst-m">ok</span></div>
 
-<script src="./app.js?v=20260831-5"></script>
+<script src="./app.js?v=20260831-6"></script>
 </body>
 </html>
