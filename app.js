@@ -428,6 +428,82 @@ function pdvMobileTab(tab){
   if(btnPed)btnPed.classList.toggle('on',tab==='pedido')
 }
 
+function normalizarTextoBusca(valor){
+  return String(valor||'')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g,'')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g,' ')
+    .trim()
+    .replace(/\s+/g,' ')
+}
+
+function distanciaBusca(a,b){
+  if(a===b)return 0
+  if(!a.length)return b.length
+  if(!b.length)return a.length
+  var anterior=Array.from({length:b.length+1},function(_,i){return i})
+  for(var i=1;i<=a.length;i++){
+    var atual=[i]
+    for(var j=1;j<=b.length;j++){
+      atual[j]=Math.min(
+        atual[j-1]+1,
+        anterior[j]+1,
+        anterior[j-1]+(a[i-1]===b[j-1]?0:1)
+      )
+    }
+    anterior=atual
+  }
+  return anterior[b.length]
+}
+
+function palavraBuscaSimilar(termo,palavra){
+  if(!termo||!palavra)return false
+  if(palavra.indexOf(termo)>-1||palavra.indexOf(termo)===0)return true
+  if(termo.length<3)return false
+  var limite=termo.length>=7?2:1
+  return distanciaBusca(termo,palavra)<=limite
+}
+
+function pontuarProdutoBusca(produto,termo){
+  var busca=normalizarTextoBusca(termo)
+  if(!busca)return 1
+  var nome=normalizarTextoBusca(produto.nome)
+  var categoria=normalizarTextoBusca(produto.categoria)
+  var codigo=String(produto.codigo_barras||'').trim().toLowerCase()
+  if(codigo&&codigo===String(termo||'').trim().toLowerCase())return 1000
+  if(nome===busca)return 900
+  if(nome.indexOf(busca)===0)return 800
+  if(nome.indexOf(busca)>-1)return 700
+  if(codigo&&codigo.indexOf(busca)>-1)return 650
+  var palavrasNome=nome.split(' ').filter(Boolean)
+  var termos=busca.split(' ').filter(Boolean)
+  var pontos=0
+  var encontrouTodos=termos.every(function(parte){
+    if(nome.indexOf(parte)>-1){pontos+=80;return true}
+    var semelhante=palavrasNome.some(function(palavra){return palavraBuscaSimilar(parte,palavra)})
+    if(semelhante)pontos+=45
+    return semelhante
+  })
+  if(encontrouTodos)return 400+pontos
+  if(categoria.indexOf(busca)>-1)return 120
+  return -1
+}
+
+function listarProdutosBusca(termo){
+  var lista=prods
+  if(catA!=='Todos')lista=lista.filter(function(p){return p.categoria===catA})
+  var busca=normalizarTextoBusca(termo)
+  if(!busca)return lista.slice()
+  return lista.map(function(p){return{produto:p,pontos:pontuarProdutoBusca(p,termo)}})
+    .filter(function(item){return item.pontos>=0})
+    .sort(function(a,b){
+      if(b.pontos!==a.pontos)return b.pontos-a.pontos
+      return String(a.produto.nome||'').localeCompare(String(b.produto.nome||''),'pt-BR')
+    })
+    .map(function(item){return item.produto})
+}
+
 // A busca do PDV tambem recebe a leitura do scanner USB. Leitores comuns digitam o
 // codigo no campo focado e enviam Enter; nesse caso o produto entra direto no pedido.
 function buscarProdutoEnter(e){
@@ -436,7 +512,12 @@ function buscarProdutoEnter(e){
   var termo=campo.value.trim()
   if(!termo)return
   var p=prods.find(function(x){return String(x.codigo_barras||'')===termo})
-  if(!p)return
+  if(!p){
+    var candidatos=listarProdutosBusca(termo)
+    p=candidatos.find(function(x){return normalizarTextoBusca(x.nome)===normalizarTextoBusca(termo)})
+    if(!p&&candidatos.length===1)p=candidatos[0]
+  }
+  if(!p){renderPDV();return}
   e.preventDefault()
   addCart(p.id,Number(p.preco_venda))
   campo.value=''
@@ -468,9 +549,8 @@ function renderCats(){
 function setcat(c){catA=c;renderCats();renderPDV()}
 
 function renderPDV(){
-  var q=(document.getElementById('srch')||{}).value?document.getElementById('srch').value.toLowerCase():''
-  var lista=prods.filter(function(p){return p.nome.toLowerCase().includes(q)||(p.codigo_barras||'').includes(q)})
-  if(catA!=='Todos')lista=lista.filter(function(p){return p.categoria===catA})
+  var q=(document.getElementById('srch')||{}).value||''
+  var lista=listarProdutosBusca(q)
   var g=document.getElementById('pgrid')
   if(!lista.length){g.innerHTML='<div class="empty" style="grid-column:1/-1">Nenhum produto</div>';return}
   var hoje=new Date().toISOString().slice(0,10)
@@ -589,8 +669,12 @@ function finalizarVenda(){
   document.getElementById('nf-modal').classList.add('open')
 }
 
-function confirmarPay(metodo){
+async function confirmarPay(metodo){
   if(!mesaPagamentoAtivo && !cart.length){toast('Adicione produtos ao pedido',1);return}
+  if(!mesaPagamentoAtivo&&userLogado&&userLogado.nivel!=='superadmin'){
+    var caixaAberto=await garantirTurnoCaixaAberto(true)
+    if(!caixaAberto)return
+  }
   // Cartao: perguntar debito ou credito
   if(metodo==='Cartao'){
     document.getElementById('ov-cartao').classList.add('open')
@@ -718,7 +802,11 @@ function confirmarFiado(){
   abrirConfirmar('Fiado - '+clienteNome.split(' - ')[0])
 }
 
-function confirmarVenda(){
+async function confirmarVenda(){
+  if(userLogado&&userLogado.nivel!=='superadmin'){
+    var caixaAberto=await garantirTurnoCaixaAberto(true)
+    if(!caixaAberto)return
+  }
   closeModals()
   // Resetar estado do modal NF
   document.getElementById('nf-btns-iniciais').style.display='flex'
@@ -731,6 +819,10 @@ function confirmarVenda(){
 
 async function pay(metodo,cpf,imprimirRecibo){
   if(!cart.length){toast('Adicione produtos',1);return}
+  if(userLogado&&userLogado.nivel!=='superadmin'){
+    var caixaAberto=await garantirTurnoCaixaAberto(true)
+    if(!caixaAberto)return
+  }
   if(vendaEmProcessamento){toast('Aguarde, a venda esta sendo registrada',1);return}
   vendaEmProcessamento=true
   var janelaRecibo=imprimirRecibo?window.open('','_blank','width=520,height=820'):null
@@ -1446,6 +1538,7 @@ async function carregarTurnoAtual(){
 function atualizarStatusCaixaPdv(){
   var status=document.getElementById('pdv-caixa-status')
   var botaoAbrir=document.getElementById('btn-pdv-abrir')
+  var botaoFinalizar=document.getElementById('btn-finalizar-venda')
   var botoes=['btn-pdv-sangria','btn-pdv-suprimento','btn-pdv-fechar']
   if(status){
     if(turnoAtual){
@@ -1458,6 +1551,7 @@ function atualizarStatusCaixaPdv(){
     }
   }
   if(botaoAbrir)botaoAbrir.style.display=turnoAtual?'none':'inline-flex'
+  if(botaoFinalizar)botaoFinalizar.disabled=!turnoAtual
   botoes.forEach(function(id){var el=document.getElementById(id);if(el)el.disabled=!turnoAtual})
 }
 
@@ -1475,15 +1569,17 @@ function cancelarAberturaCaixa(){
   if(modal)modal.classList.remove('open')
 }
 
-async function garantirTurnoCaixaAberto(){
-  if(turnoAtual&&turnoAtual.status==='aberto'){atualizarStatusCaixaPdv();return true}
+async function garantirTurnoCaixaAberto(forcarConsulta){
+  if(!forcarConsulta&&turnoAtual&&turnoAtual.status==='aberto'){atualizarStatusCaixaPdv();return true}
   if(verificandoTurnoCaixa)return false
   verificandoTurnoCaixa=true
   try{
     await carregarTurnoAtual()
     if(turnoAtual)return true
+    closeModals()
     selecionarGrupoMenu('vendas')
     abrirModalAberturaCaixa()
+    toast('Abra o caixa antes de finalizar uma venda',1)
     return false
   }catch(e){
     toast('Nao foi possivel verificar o caixa',1)
@@ -1911,13 +2007,12 @@ function drawProds(lista){
 }
 
 function filterProdsTabela(){
-  var q=document.getElementById('srch-prods').value.trim().toLowerCase()
+  var q=document.getElementById('srch-prods').value.trim()
   if(!q){drawProds(prods);return}
-  var filtrado=prods.filter(function(p){
-    return (p.nome||'').toLowerCase().indexOf(q)>-1||
-      (p.categoria||'').toLowerCase().indexOf(q)>-1||
-      (p.codigo_barras||'').toLowerCase().indexOf(q)>-1
-  })
+  var filtrado=prods.map(function(p){return{produto:p,pontos:pontuarProdutoBusca(p,q)}})
+    .filter(function(item){return item.pontos>=0})
+    .sort(function(a,b){return b.pontos-a.pontos})
+    .map(function(item){return item.produto})
   drawProds(filtrado)
 }
 
@@ -2853,8 +2948,12 @@ function confirmarRecebimentoPIX(){
 }
 
 // RESUMO DO PEDIDO
-function abrirResumoPedido(){
+async function abrirResumoPedido(){
   if(!cart.length){ toast('Adicione produtos ao pedido', 1); return }
+  if(userLogado&&userLogado.nivel!=='superadmin'){
+    var caixaAberto=await garantirTurnoCaixaAberto(true)
+    if(!caixaAberto)return
+  }
   var orig = cart.reduce(function(a,c){ return a + Number(c.preco_venda)*c.qty }, 0)
   var total = cart.reduce(function(a,c){ return a + Number(c.preco_final)*c.qty }, 0)
   var desc = orig - total
