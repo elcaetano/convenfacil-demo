@@ -983,6 +983,15 @@ function moedaRecibo(valor){
   return Number(valor||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})
 }
 
+function dataHoraBanco(valor){
+  if(valor instanceof Date)return valor
+  var texto=String(valor||'').trim()
+  // O esquema antigo devolvia timestamps UTC sem o sufixo de fuso. Sem o Z,
+  // o navegador interpreta o valor como horario local e adianta o recibo.
+  if(/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(texto)&&!/(?:Z|[+-]\d{2}(?::?\d{2})?)$/i.test(texto))texto+='Z'
+  return new Date(texto)
+}
+
 function montarHtmlReciboVenda(dados){
   dados=dados||{}
   var cpf=dados.cpf_consumidor||''
@@ -997,7 +1006,7 @@ function montarHtmlReciboVenda(dados){
   var endereco=localStorage.getItem('end_loja')||''
   var cidade=localStorage.getItem('cidade_loja')||''
   var rodape=localStorage.getItem('rodape_cupom')||'Obrigado pela preferência!'
-  var dataVenda=criadoEm?new Date(criadoEm):new Date()
+  var dataVenda=criadoEm?dataHoraBanco(criadoEm):new Date()
   if(isNaN(dataVenda.getTime()))dataVenda=new Date()
   var dt=dataVenda.toLocaleDateString('pt-BR')+' às '+dataVenda.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})
   var numeroRecibo=vendaId?String(vendaId).replace(/-/g,'').slice(0,8).toUpperCase():String(Date.now()).slice(-8)
