@@ -54,11 +54,17 @@ function imprimirViaIframe(html){
 // Recibos para o cliente: mesmo esquema do cartaz A4 — abre uma janela de verdade com
 // preview visivel + barra "Imprimir agora"/"Fechar", pra quem esta no caixa decidir se imprime.
 // Nao dispara .print() sozinho (diferente do imprimirViaIframe, que e so pra cupom de cozinha/relatorios).
-function imprimirComPreview(html,tituloBarra,janelaAberta){
+function imprimirComPreview(html,tituloBarra,janelaAberta,permitirFormato){
   // Chrome da janela de preview no mesmo padrao visual do resto do app (cores, fonte, botoes) —
   // so o CONTEUDO do papel/cupom continua branco/preto de proposito, pra imprimir igual numa impressora de verdade.
+  var seletorFormato=permitirFormato?'<div class="preview-formats">'+
+    '<span>Papel</span>'+
+    '<button type="button" id="preview-format-a4" onclick="definirFormatoImpressao(\'a4\')">A4</button>'+
+    '<button type="button" id="preview-format-80" onclick="definirFormatoImpressao(\'80mm\')">80 mm</button>'+
+  '</div>':''
   var toolbar='<div class="no-print preview-toolbar">'+
     '<div class="preview-heading"><span class="preview-icon">&#x1F5A8;</span><div><strong>'+(tituloBarra||'Pronto para imprimir')+'</strong><small>Confira os dados antes de continuar</small></div></div>'+
+    seletorFormato+
     '<div class="preview-actions">'+
       '<button type="button" class="preview-close" onclick="window.close()">Fechar</button>'+
       '<button type="button" class="preview-print" onclick="window.print()">Imprimir</button>'+
@@ -70,20 +76,34 @@ function imprimirComPreview(html,tituloBarra,janelaAberta){
       'body{box-shadow:0 12px 48px rgba(0,0,0,.55);margin-left:auto!important;margin-right:auto!important}'+
       '.preview-toolbar{position:fixed;top:0;left:0;right:0;min-height:64px;background:#13161e;padding:10px 18px;display:flex;align-items:center;justify-content:space-between;gap:14px;z-index:999;border-bottom:1px solid #2e3548;font-family:system-ui,-apple-system,sans-serif;box-shadow:0 4px 24px rgba(0,0,0,.4)}'+
       '.preview-heading{display:flex;align-items:center;gap:10px;color:#fff;min-width:0}.preview-heading strong{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.preview-heading small{display:block;color:#8991ac;font-size:11px;margin-top:2px}.preview-icon{font-size:20px}'+
+      '.preview-formats{height:38px;padding:3px;display:flex;align-items:center;gap:3px;border:1px solid #3a4260;border-radius:9px;background:#0d0f14;color:#8991ac;font-size:11px;white-space:nowrap}.preview-formats>span{padding:0 6px}.preview-formats button{height:30px;padding:0 10px;border:1px solid transparent;border-radius:6px;background:transparent;color:#b3b9cf;font-family:inherit;font-size:11px;font-weight:700;cursor:pointer}.preview-formats button.on{background:#1a2d52;border-color:#4f8ef7;color:#fff}'+
       '.preview-actions{display:flex;gap:8px;flex-shrink:0}.preview-actions button{height:38px;padding:0 16px;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}'+
       '.preview-close{background:#222736;color:#fff;border:1px solid #3a4260}.preview-print{background:#3ecf8e;color:#0d0f14;border:1px solid #3ecf8e}'+
       '.preview-spacer{height:76px}'+
-      '@media(max-width:460px){.preview-toolbar{align-items:stretch;flex-direction:column}.preview-actions button{flex:1}.preview-actions{width:100%}.preview-spacer{height:118px}}'+
+      '@media(max-width:680px){.preview-toolbar{flex-wrap:wrap}.preview-heading{flex:1 1 260px}.preview-formats{order:3;width:100%;justify-content:center}.preview-actions{margin-left:auto}.preview-spacer{height:126px}}'+
+      '@media(max-width:460px){.preview-toolbar{align-items:stretch;flex-direction:column;flex-wrap:nowrap}.preview-actions button{flex:1}.preview-actions{width:100%}.preview-formats{order:0}.preview-spacer{height:180px}}'+
     '}'+
     '@media print{.no-print{display:none!important}}'+
   '</style>'
+  var scriptFormato=permitirFormato?'<style id="preview-print-format"></style><script>(function(){'+
+    'var estilo=document.getElementById("preview-print-format");'+
+    'window.definirFormatoImpressao=function(formato){'+
+      'var a4=formato==="a4";'+
+      'estilo.textContent=a4?"@page{size:A4 portrait;margin:12mm}@media print{html,body{width:auto!important;max-width:none!important}body{width:100%!important;max-width:170mm!important;min-height:0!important;margin:0 auto!important;padding:7mm!important;font-size:12px!important;line-height:1.45!important}.brand{font-size:22px!important}.doc-title{font-size:16px!important}.item-desc strong{font-size:12px!important}.item-desc span,.store-meta{font-size:10.5px!important}.grand-total{font-size:18px!important}}":"@page{size:80mm auto;margin:0}@media print{html,body{width:80mm!important;max-width:80mm!important;margin:0!important}body{margin:0!important}}";'+
+      'document.getElementById("preview-format-a4").classList.toggle("on",a4);'+
+      'document.getElementById("preview-format-80").classList.toggle("on",!a4);'+
+      'document.querySelector(".preview-print").textContent=a4?"Imprimir em A4":"Imprimir em 80 mm";'+
+      'try{localStorage.setItem("convenfacil.formato.impressao",formato)}catch(e){}'+
+    '};'+
+    'var salvo="a4";try{salvo=localStorage.getItem("convenfacil.formato.impressao")||"a4"}catch(e){}definirFormatoImpressao(salvo);'+
+  '})();<\/script>':''
   var htmlComToolbar=html
     .replace('<style>',fundoPreview+'<style>')
-    .replace(/<body>/,'<body>'+toolbar)
+    .replace(/<body>/,'<body>'+toolbar+scriptFormato)
   if(htmlComToolbar.indexOf('onafterprint')===-1){
     htmlComToolbar=htmlComToolbar.replace('</body>','<script>window.onafterprint=function(){window.close()}<\/script></body>')
   }
-  var w=janelaAberta||window.open('','_blank','width=520,height=820')
+  var w=janelaAberta||window.open('','_blank','width=720,height=820')
   if(!w){imprimirViaIframe(html);return}
   w.document.write(htmlComToolbar)
   w.document.close()
@@ -886,7 +906,7 @@ async function pay(metodo,cpf,imprimirRecibo){
   }
   if(vendaEmProcessamento){toast('Aguarde, a venda esta sendo registrada',1);return}
   vendaEmProcessamento=true
-  var janelaRecibo=imprimirRecibo?window.open('','_blank','width=520,height=820'):null
+  var janelaRecibo=imprimirRecibo?window.open('','_blank','width=720,height=820'):null
   var itensVenda=cart.map(function(c){
     return Object.assign({},c,{qty:Number(c.qty),preco_final:Number(c.preco_final),preco_venda:Number(c.preco_venda||c.preco_final)})
   })
@@ -1091,7 +1111,7 @@ function montarHtmlReciboVenda(dados){
 
 function imprimirReciboVenda(dados,janelaAberta){
   var html=montarHtmlReciboVenda(dados)
-  imprimirComPreview(html,'Recibo pronto para imprimir',janelaAberta)
+  imprimirComPreview(html,'Recibo pronto para imprimir',janelaAberta,true)
 }
 
 function atualizarBotaoUltimoRecibo(){
@@ -1106,7 +1126,7 @@ function imprimirUltimoRecibo(){
 
 async function reimprimirVenda(vendaId){
   if(!vendaId){toast('Venda nao identificada',1);return}
-  var janela=window.open('','_blank','width=520,height=820')
+  var janela=window.open('','_blank','width=720,height=820')
   try{
     var resultados=await Promise.all([
       scopeCid(db.from('vendas').select('*')).eq('id',vendaId).single(),
@@ -1794,7 +1814,7 @@ function imprimirReciboSangria(movimento,janelaAberta){
     '<p class="declaration">Declaro que recebi o valor acima, retirado do caixa pelo motivo informado neste documento.</p>'+
     '<div class="signatures"><div class="signature">Assinatura de quem recebeu</div><div class="signature">Assinatura do responsável pelo caixa</div></div>'+
     '<div class="footer">Documento de controle interno • ConvenFácil</div></body></html>'
-  imprimirComPreview(html,'Recibo de sangria pronto para imprimir',janelaAberta)
+  imprimirComPreview(html,'Recibo de sangria pronto para imprimir',janelaAberta,true)
 }
 
 async function abrirFecharCaixa(){
@@ -3715,7 +3735,7 @@ function imprimirFechamentoComandaDividida(pagamentos,total){
     '<div class="linha"></div><div class="b" style="margin-bottom:2px">Pagamento dividido:</div>'+pagsHtml+
     '<div class="linha"></div><div class="c" style="font-size:10px">'+rodape+'</div>'+
     '</body></html>'
-  imprimirComPreview(html,'Recibo da mesa (conta dividida) pronto para impressao')
+  imprimirComPreview(html,'Recibo da mesa (conta dividida) pronto para impressao',null,true)
 }
 
 // Fecha a comanda depois que o mesmo fluxo de pagamento do PDV (troco/cartao/PIX/fiado)
@@ -3771,7 +3791,7 @@ function imprimirFechamentoComanda(metodo,total){
     '<div class="linha"></div><div class="c" style="font-size:10px">'+rodape+'</div>'+
     '<script>window.onafterprint=function(){window.close()}<\/script>'+
     '</body></html>'
-  imprimirComPreview(html,'Recibo da mesa pronto para impressao')
+  imprimirComPreview(html,'Recibo da mesa pronto para impressao',null,true)
 }
 
 async function registrarComissoesComanda(){
