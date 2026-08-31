@@ -7,8 +7,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Oswald:wght@400;700&display=swap" rel="stylesheet">
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<link rel="stylesheet" href="./styles.css?v=20260831-6">
+<link rel="stylesheet" href="./styles.css?v=20260831-7">
 </head>
 <body>
 
@@ -41,7 +40,7 @@
     <div class="nav-wrap" id="nav-wrap">
       <!-- VENDAS -->
       <div class="nav-group" id="grp-vendas">
-        <button class="nav-group-header on" type="button" onclick="selecionarGrupoMenu('vendas')" title="Vendas" aria-label="Vendas" aria-controls="submenu-vendas">
+        <button class="nav-group-header on" type="button" onclick="abrirGrupoMenu('vendas')" title="Vendas" aria-label="Vendas" aria-controls="submenu-vendas">
           <span class="nav-group-icon">&#x1F4B2;</span><span class="nav-group-label">Vendas</span>
         </button>
       </div>
@@ -75,7 +74,9 @@
     </div>
   </div>
 
-  <button class="sidebar-toggle" id="sidebar-toggle" type="button" onclick="toggleSidebar()" aria-label="Recolher menu lateral" title="Recolher menu lateral">&#x2039;</button>
+  <button class="sidebar-toggle" id="sidebar-toggle" type="button" onclick="toggleSidebar()" aria-label="Recolher menu lateral" title="Recolher menu lateral">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+  </button>
 
   <!-- MODO MOBILE: botao hamburger fixo (abre/fecha o menu lateral) + overlay escuro -->
   <button class="mobile-menu-btn" onclick="toggleMobileSidebar()" title="Menu">&#9776;</button>
@@ -84,6 +85,8 @@
   <div class="main">
 
     <nav class="context-nav" id="context-nav" aria-label="Menu do módulo">
+      <strong class="context-nav-title" id="context-nav-title">Vendas</strong>
+      <span class="context-nav-divider" aria-hidden="true"></span>
       <div class="context-nav-group on" id="submenu-vendas">
         <button class="context-nav-item on" id="nav-pdv" type="button" onclick="go('pdv',this)"><span>&#x1F6D2;</span> PDV / Caixa</button>
         <button class="context-nav-item" id="nav-mesas" type="button" onclick="go('mesas',this)" style="display:none"><span>&#x1F37D;</span> Mesas</button>
@@ -120,22 +123,11 @@
         <div class="topbar-right">
           <span style="font-size:12px;color:var(--txt3)" id="pdv-info">Carregando...</span>
           <span class="cash-status" id="pdv-caixa-status">Caixa fechado</span>
+          <button class="btn sm grn" id="btn-pdv-abrir" type="button" onclick="abrirModalAberturaCaixa()" title="Informar o valor inicial e abrir o caixa">&#x1F513; Abrir caixa</button>
           <button class="btn sm red" id="btn-pdv-sangria" type="button" onclick="abrirMovimentoCaixa('sangria')" title="Registrar retirada de dinheiro" disabled>&#x2796; Sangria</button>
           <button class="btn sm grn" id="btn-pdv-suprimento" type="button" onclick="abrirMovimentoCaixa('suprimento')" title="Registrar entrada de dinheiro" disabled>&#x2795; Suprimento</button>
           <button class="btn sm" id="btn-pdv-fechar" type="button" onclick="abrirFecharCaixa()" title="Fechar o caixa atual" disabled>&#x1F512; Fechar</button>
-          <button class="btn sm" onclick="toggleBarcode()" id="btn-barcode" title="Leitor USB de codigo de barras">&#x1F4F0; USB</button>
-          <button class="btn sm" onclick="toggleCamera()" id="btn-camera" title="Leitor por camera">&#x1F4F7; Camera</button>
         </div>
-      </div>
-      <div id="barcode-area" style="display:none;padding:8px 20px 0;background:var(--bg1);border-bottom:1px solid var(--border)">
-        <input class="search-input" type="text" id="barcode-input" placeholder="Digite ou escaneie o codigo de barras e pressione Enter..." onkeydown="barcodeEnter(event)" style="font-family:monospace">
-      </div>
-      <div id="camera-area" style="display:none;padding:8px 20px;background:var(--bg1);border-bottom:1px solid var(--border)">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-          <span style="font-size:13px;color:var(--txt2)">&#x1F4F7; Aponte a camera para o codigo de barras</span>
-          <button class="btn sm red" onclick="pararCamera()">Parar camera</button>
-        </div>
-        <div id="camera-reader" style="max-width:400px"></div>
       </div>
       <div class="pdv-tabs">
         <button id="pdv-tab-produtos" class="on" onclick="pdvMobileTab('produtos')">&#x1F6D2; Produtos</button>
@@ -143,9 +135,13 @@
       </div>
       <div class="pdv-layout">
         <div class="pdv-left" id="pdv-left">
-          <div class="atalhos-global" title="F2 busca produto | F3 leitor USB | F4 finalizar venda | F6 imprimir cupom | Ctrl+Delete limpar pedido | F10 chama o PDV de qualquer tela">&#x2328; F2 busca &bull; F3 leitor &bull; F4 finalizar &bull; F6 cupom &bull; Ctrl+Del limpar &bull; F10 volta ao PDV</div>
-          <div class="search-box">
-            <input class="search-input" type="text" id="srch" placeholder="Buscar produto..." oninput="filterProds()">
+          <div class="atalhos-global" title="F2 busca produto | F4 finalizar venda | F6 imprimir cupom | Ctrl+Delete limpar pedido | F10 chama o PDV de qualquer tela">&#x2328; F2 busca &bull; F4 finalizar &bull; F6 cupom &bull; Ctrl+Del limpar &bull; F10 volta ao PDV</div>
+          <div class="search-box search-box-unified">
+            <input class="search-input" type="text" id="srch" placeholder="Digite o produto ou bipe o código de barras..." oninput="filterProds()" onkeydown="buscarProdutoEnter(event)" autocomplete="off">
+            <div class="search-assist" aria-hidden="true">
+              <span><b>&#x2328;</b> Localizar digitando</span>
+              <span><b>&#x25A5;</b> Bipar código de barras</span>
+            </div>
           </div>
           <div class="cat-filter" id="cat-filter"></div>
           <div class="pgrid" id="pgrid"><div class="loading" style="grid-column:1/-1"><div class="spin"></div>Carregando...</div></div>
@@ -410,7 +406,6 @@
           <h3 style="margin-bottom:14px">&#x2328; Atalhos de teclado do PDV</h3>
           <p style="font-size:12px;color:var(--txt3);margin-bottom:12px">Funcionam com a tela de Caixa aberta, sem nenhum modal na frente. Bom pra treinar quem vai operar o caixa.</p>
           <div class="lrow"><span>F2</span><span style="color:var(--txt2)">Focar busca de produto</span></div>
-          <div class="lrow"><span>F3</span><span style="color:var(--txt2)">Ligar/desligar leitor USB</span></div>
           <div class="lrow"><span>F4</span><span style="color:var(--txt2)">Abrir Finalizar Venda</span></div>
           <div class="lrow"><span>F6</span><span style="color:var(--txt2)">Imprimir cupom</span></div>
           <div class="lrow"><span>Ctrl + Delete</span><span style="color:var(--txt2)">Limpar pedido (combinacao de proposito, pra nao disparar sem querer)</span></div>
@@ -429,7 +424,6 @@
 
     <!-- SUPER ADMIN -->
     <div class="sec" id="sec-superadmin">
-      <div class="topbar"><h1>Painel Master</h1><button class="btn acc" onclick="openModal('sa-cliente')">+ Novo cliente</button></div>
       <div class="sec-body">
         <div class="sa-header">
           <div class="sa-header-icon">&#x1F3F0;</div>
@@ -765,18 +759,6 @@
   </div>
 </div>
 
-<!-- MODAL CAMERA LEITOR -->
-<div class="ov" id="ov-camera-modal">
-  <div class="modal" style="max-width:420px">
-    <h2>&#x1F4F7; Leitor por camera</h2>
-    <p style="font-size:13px;color:var(--txt2);margin-bottom:14px">Aponte a camera para o codigo de barras do produto</p>
-    <div id="camera-reader-modal"></div>
-    <div class="modal-ft">
-      <button class="btn red" onclick="pararCameraModal()">Parar camera</button>
-    </div>
-  </div>
-</div>
-
 <!-- MODAL CARTAO DEBITO/CREDITO -->
 <div class="ov" id="ov-cartao">
   <div class="modal" style="text-align:center;max-width:380px">
@@ -977,6 +959,7 @@
   <div class="modal" style="max-width:380px">
     <h2 id="mc-titulo">Sangria</h2>
     <div class="fg"><label>Valor (R$)</label><input type="number" id="mc-valor" placeholder="0,00" step="0.01" min="0"></div>
+    <div class="fg" id="mc-recebedor-wrap"><label for="mc-recebedor">Nome de quem está retirando</label><input type="text" id="mc-recebedor" placeholder="Nome completo" autocomplete="name"></div>
     <div class="fg"><label>Motivo</label><input type="text" id="mc-motivo" placeholder="Ex: pagamento de entregador"></div>
     <div class="modal-ft"><button class="btn" onclick="closeModals()">Cancelar</button><button class="btn acc" onclick="confirmarMovimentoCaixa()">&#x2713; Confirmar</button></div>
   </div>
@@ -986,7 +969,15 @@
 <div class="ov" id="ov-fechar-caixa">
   <div class="modal" style="max-width:420px">
     <h2>&#x1F512; Fechar caixa</h2>
-    <div class="fg"><label>Valor esperado em dinheiro (calculado pelo sistema)</label><div id="fc-esperado" style="font-size:20px;font-weight:800;color:var(--green);padding:6px 0">R$ 0,00</div></div>
+    <p class="modal-help">Confira toda a movimentação do turno antes de informar o dinheiro contado no encerramento.</p>
+    <div class="cash-reconciliation" id="fc-resumo">
+      <div><span>Valor de abertura</span><strong id="fc-abertura">R$ 0,00</strong></div>
+      <div><span>Vendas no PDV em dinheiro</span><strong id="fc-vendas">R$ 0,00</strong></div>
+      <div><span>Mesas recebidas em dinheiro</span><strong id="fc-mesas">R$ 0,00</strong></div>
+      <div><span>Suprimentos</span><strong class="positive" id="fc-suprimentos">R$ 0,00</strong></div>
+      <div><span>Sangrias</span><strong class="negative" id="fc-sangrias">- R$ 0,00</strong></div>
+      <div class="cash-reconciliation-total"><span>Valor esperado no caixa</span><strong id="fc-esperado">R$ 0,00</strong></div>
+    </div>
     <div class="fg"><label>Valor contado no caixa (R$)</label><input type="number" id="fc-informado" placeholder="0,00" step="0.01" min="0" oninput="calcDiferencaCaixa()"></div>
     <div id="fc-diferenca-wrap" style="display:none;margin:10px 0;padding:10px;border-radius:var(--rad);text-align:center">
       <div style="font-size:11px;color:var(--txt3);text-transform:uppercase;margin-bottom:4px">Diferenca</div>
@@ -1012,6 +1003,6 @@
 
 <div class="toast ok" id="tst"><span class="tic" id="tic">&#x2713;</span><span id="tst-m">ok</span></div>
 
-<script src="./app.js?v=20260831-6"></script>
+<script src="./app.js?v=20260831-7"></script>
 </body>
 </html>

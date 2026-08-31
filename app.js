@@ -53,7 +53,7 @@ function imprimirViaIframe(html){
 // Recibos para o cliente: mesmo esquema do cartaz A4 — abre uma janela de verdade com
 // preview visivel + barra "Imprimir agora"/"Fechar", pra quem esta no caixa decidir se imprime.
 // Nao dispara .print() sozinho (diferente do imprimirViaIframe, que e so pra cupom de cozinha/relatorios).
-function imprimirComPreview(html,tituloBarra){
+function imprimirComPreview(html,tituloBarra,janelaAberta){
   // Chrome da janela de preview no mesmo padrao visual do resto do app (cores, fonte, botoes) —
   // so o CONTEUDO do papel/cupom continua branco/preto de proposito, pra imprimir igual numa impressora de verdade.
   var toolbar='<div class="no-print preview-toolbar">'+
@@ -82,7 +82,8 @@ function imprimirComPreview(html,tituloBarra){
   if(htmlComToolbar.indexOf('onafterprint')===-1){
     htmlComToolbar=htmlComToolbar.replace('</body>','<script>window.onafterprint=function(){window.close()}<\/script></body>')
   }
-  var w=window.open('','_blank','width=520,height=820')
+  var w=janelaAberta||window.open('','_blank','width=520,height=820')
+  if(!w){imprimirViaIframe(html);return}
   w.document.write(htmlComToolbar)
   w.document.close()
 }
@@ -316,6 +317,16 @@ var grupoPorTela={
   users:'gestao',config:'gestao',excecoes:'gestao',superadmin:'gestao'
 }
 
+var nomeGrupoMenu={vendas:'Vendas',estoque:'Estoque',fin:'Financeiro',gestao:'Gestão'}
+
+function abrirGrupoMenu(id){
+  if(id==='vendas'){
+    go('pdv',document.getElementById('nav-pdv'))
+    return
+  }
+  selecionarGrupoMenu(id)
+}
+
 function selecionarGrupoMenu(id){
   document.querySelectorAll('.nav-group-header').forEach(function(el){el.classList.remove('on')})
   document.querySelectorAll('.context-nav-group').forEach(function(el){el.classList.remove('on')})
@@ -324,6 +335,8 @@ function selecionarGrupoMenu(id){
   if(header)header.classList.add('on')
   if(submenu)submenu.classList.add('on')
   var contextNav=document.getElementById('context-nav')
+  var contextTitle=document.getElementById('context-nav-title')
+  if(contextTitle)contextTitle.textContent=nomeGrupoMenu[id]||''
   if(contextNav)contextNav.style.display='flex'
   if(window.innerWidth<=768)fecharMobileSidebar()
 }
@@ -333,7 +346,6 @@ function aplicarEstadoSidebar(recolhida){
   var botao=document.getElementById('sidebar-toggle')
   if(!app||!botao)return
   app.classList.toggle('sidebar-collapsed',recolhida)
-  botao.innerHTML=recolhida?'&#x203A;':'&#x2039;'
   botao.setAttribute('aria-label',recolhida?'Expandir menu lateral':'Recolher menu lateral')
   botao.title=recolhida?'Expandir menu lateral':'Recolher menu lateral'
 }
@@ -413,21 +425,20 @@ function pdvMobileTab(tab){
   if(btnPed)btnPed.classList.toggle('on',tab==='pedido')
 }
 
-// BARCODE
-function toggleBarcode(){
-  var area=document.getElementById('barcode-area')
-  var input=document.getElementById('barcode-input')
-  if(area.style.display==='none'){area.style.display='block';input.focus();toast('Leitor de codigo de barras ativado')}
-  else{area.style.display='none'}
-}
-
-function barcodeEnter(e){
+// A busca do PDV tambem recebe a leitura do scanner USB. Leitores comuns digitam o
+// codigo no campo focado e enviam Enter; nesse caso o produto entra direto no pedido.
+function buscarProdutoEnter(e){
   if(e.key!=='Enter')return
-  var code=document.getElementById('barcode-input').value.trim()
-  if(!code)return
-  var p=prods.find(function(x){return x.codigo_barras===code})
-  if(p){addCart(p.id,Number(p.preco_venda));document.getElementById('barcode-input').value='';document.getElementById('barcode-input').focus()}
-  else{toast('Produto nao encontrado: '+code,1)}
+  var campo=document.getElementById('srch')
+  var termo=campo.value.trim()
+  if(!termo)return
+  var p=prods.find(function(x){return String(x.codigo_barras||'')===termo})
+  if(!p)return
+  e.preventDefault()
+  addCart(p.id,Number(p.preco_venda))
+  campo.value=''
+  renderPDV()
+  campo.focus()
 }
 
 // PRODUTOS
@@ -1304,6 +1315,7 @@ async function receberConta(id){
 // limitacao do relatorio "Vendas por forma de pagamento": o texto salvo ali e um resumo livre).
 var turnoAtual=null
 var caixaValorEsperado=0
+var caixaConferenciaAtual=null
 var verificandoTurnoCaixa=false
 
 async function carregarTurnoAtual(){
@@ -1316,6 +1328,7 @@ async function carregarTurnoAtual(){
 
 function atualizarStatusCaixaPdv(){
   var status=document.getElementById('pdv-caixa-status')
+  var botaoAbrir=document.getElementById('btn-pdv-abrir')
   var botoes=['btn-pdv-sangria','btn-pdv-suprimento','btn-pdv-fechar']
   if(status){
     if(turnoAtual){
@@ -1327,6 +1340,7 @@ function atualizarStatusCaixaPdv(){
       status.classList.add('closed')
     }
   }
+  if(botaoAbrir)botaoAbrir.style.display=turnoAtual?'none':'inline-flex'
   botoes.forEach(function(id){var el=document.getElementById(id);if(el)el.disabled=!turnoAtual})
 }
 
@@ -1394,21 +1408,52 @@ function abrirMovimentoCaixa(tipo){
   document.getElementById('mc-titulo').innerHTML=tipo==='sangria'?'&#x2796; Sangria (retirar dinheiro)':'&#x2795; Suprimento (adicionar dinheiro)'
   document.getElementById('mc-valor').value=''
   document.getElementById('mc-motivo').value=''
+  document.getElementById('mc-recebedor').value=''
+  document.getElementById('mc-recebedor-wrap').style.display=tipo==='sangria'?'block':'none'
   document.getElementById('ov-movimento-caixa').classList.add('open')
+  setTimeout(function(){document.getElementById('mc-valor').focus()},80)
 }
 async function confirmarMovimentoCaixa(){
   var tipo=document.getElementById('mc-titulo').getAttribute('data-tipo')
   var valor=parseFloat(document.getElementById('mc-valor').value)||0
   var motivo=document.getElementById('mc-motivo').value.trim()
+  var recebedor=document.getElementById('mc-recebedor').value.trim()
   if(valor<=0){toast('Informe um valor valido',1);return}
+  if(tipo==='sangria'&&!recebedor){toast('Informe quem está retirando o dinheiro',1);document.getElementById('mc-recebedor').focus();return}
   if(!motivo){toast('Informe o motivo',1);return}
   if(!turnoAtual){toast('Nenhum caixa aberto',1);return}
-  var res=await db.from('movimentos_caixa').insert({cliente_id:meuCid(),turno_id:turnoAtual.id,tipo:tipo,valor:valor,motivo:motivo,usuario_nome:userLogado.nome})
-  if(res.error){console.error(res.error);toast('Erro ao registrar movimento',1);return}
-  registrarExcecao(tipo==='sangria'?'SANGRIA DE CAIXA':'SUPRIMENTO DE CAIXA',motivo+'. Valor: R$ '+valor.toFixed(2),valor)
+  var janelaRecibo=tipo==='sangria'?window.open('','_blank','width=520,height=820'):null
+  var res=await db.from('movimentos_caixa').insert({cliente_id:meuCid(),turno_id:turnoAtual.id,tipo:tipo,valor:valor,motivo:motivo,usuario_nome:userLogado.nome,recebedor_nome:tipo==='sangria'?recebedor:null}).select().single()
+  if(res.error){
+    if(janelaRecibo&&!janelaRecibo.closed)janelaRecibo.close()
+    console.error(res.error);toast('Erro ao registrar movimento',1);return
+  }
+  registrarExcecao(tipo==='sangria'?'SANGRIA DE CAIXA':'SUPRIMENTO DE CAIXA',motivo+'. Valor: R$ '+valor.toFixed(2)+(recebedor?'. Retirado por: '+recebedor:''),valor)
   closeModals()
   toast(tipo==='sangria'?'Sangria registrada':'Suprimento registrado')
+  if(tipo==='sangria')imprimirReciboSangria(res.data,janelaRecibo)
   renderCaixa()
+}
+
+function imprimirReciboSangria(movimento,janelaAberta){
+  var loja=localStorage.getItem('nome_loja')||'CONVENFÁCIL'
+  var cnpj=localStorage.getItem('cnpj_loja')||''
+  var dataMovimento=new Date(movimento.criado_em||new Date())
+  var dataTexto=dataMovimento.toLocaleDateString('pt-BR')+' às '+dataMovimento.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})
+  var numero=String(movimento.id||Date.now()).replace(/-/g,'').slice(0,8).toUpperCase()
+  var html='<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+
+    '<title>Recibo de sangria '+numero+'</title><style>'+
+    '@page{size:80mm auto;margin:0}*{box-sizing:border-box}html,body{margin:0;padding:0;background:#fff;color:#111}body{width:80mm;padding:6mm 5mm 8mm;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:1.45}.center{text-align:center}.brand{font-size:18px;font-weight:800;text-transform:uppercase}.meta{font-size:9.5px;color:#333}.line{border:0;border-top:1px dashed #555;margin:10px 0}.title{font-size:14px;font-weight:800;text-transform:uppercase}.number{font-size:9px;color:#444}.amount{border:2px solid #111;border-radius:5px;padding:9px;margin:12px 0;text-align:center}.amount span{display:block;font-size:9px;text-transform:uppercase}.amount strong{font-size:22px}.row{display:flex;justify-content:space-between;gap:12px;border-bottom:1px dotted #aaa;padding:6px 0}.row span:first-child{color:#444}.row strong{text-align:right}.declaration{margin:14px 0;font-size:10px;text-align:justify}.signatures{margin-top:30px;display:grid;gap:28px}.signature{border-top:1px solid #333;padding-top:4px;text-align:center;font-size:9px}.footer{text-align:center;font-size:8.5px;color:#444;margin-top:18px}@media print{html,body{width:80mm}}'+
+    '</style></head><body><header class="center"><div class="brand">'+escaparHtmlRecibo(loja)+'</div>'+(cnpj?'<div class="meta">CNPJ: '+escaparHtmlRecibo(cnpj)+'</div>':'')+'</header><hr class="line">'+
+    '<div class="center"><div class="title">Recibo de sangria</div><div class="number">Nº '+numero+' • '+dataTexto+'</div></div>'+
+    '<div class="amount"><span>Valor retirado</span><strong>'+moedaRecibo(movimento.valor)+'</strong></div>'+
+    '<div class="row"><span>Recebedor</span><strong>'+escaparHtmlRecibo(movimento.recebedor_nome)+'</strong></div>'+
+    '<div class="row"><span>Motivo</span><strong>'+escaparHtmlRecibo(movimento.motivo)+'</strong></div>'+
+    '<div class="row"><span>Registrado por</span><strong>'+escaparHtmlRecibo(movimento.usuario_nome)+'</strong></div>'+
+    '<p class="declaration">Declaro que recebi o valor acima, retirado do caixa pelo motivo informado neste documento.</p>'+
+    '<div class="signatures"><div class="signature">Assinatura de quem recebeu</div><div class="signature">Assinatura do responsável pelo caixa</div></div>'+
+    '<div class="footer">Documento de controle interno • ConvenFácil</div></body></html>'
+  imprimirComPreview(html,'Recibo de sangria pronto para imprimir',janelaAberta)
 }
 
 async function abrirFecharCaixa(){
@@ -1422,8 +1467,20 @@ async function abrirFecharCaixa(){
   var movs=movRes.data||[]
   var sangrias=movs.filter(function(m){return m.tipo==='sangria'}).reduce(function(a,m){return a+Number(m.valor)},0)
   var suprimentos=movs.filter(function(m){return m.tipo==='suprimento'}).reduce(function(a,m){return a+Number(m.valor)},0)
-  caixaValorEsperado=Number(turnoAtual.valor_abertura)+totalVendasDinheiro+totalMesasDinheiro+suprimentos-sangrias
-  document.getElementById('fc-esperado').textContent='R$ '+caixaValorEsperado.toFixed(2)
+  caixaConferenciaAtual={
+    abertura:Number(turnoAtual.valor_abertura),
+    vendas:totalVendasDinheiro,
+    mesas:totalMesasDinheiro,
+    suprimentos:suprimentos,
+    sangrias:sangrias
+  }
+  caixaValorEsperado=caixaConferenciaAtual.abertura+caixaConferenciaAtual.vendas+caixaConferenciaAtual.mesas+caixaConferenciaAtual.suprimentos-caixaConferenciaAtual.sangrias
+  document.getElementById('fc-abertura').textContent=moedaRecibo(caixaConferenciaAtual.abertura)
+  document.getElementById('fc-vendas').textContent=moedaRecibo(caixaConferenciaAtual.vendas)
+  document.getElementById('fc-mesas').textContent=moedaRecibo(caixaConferenciaAtual.mesas)
+  document.getElementById('fc-suprimentos').textContent=moedaRecibo(caixaConferenciaAtual.suprimentos)
+  document.getElementById('fc-sangrias').textContent='- '+moedaRecibo(caixaConferenciaAtual.sangrias)
+  document.getElementById('fc-esperado').textContent=moedaRecibo(caixaValorEsperado)
   document.getElementById('fc-informado').value=''
   document.getElementById('fc-obs').value=''
   document.getElementById('fc-diferenca-wrap').style.display='none'
@@ -1439,9 +1496,9 @@ function calcDiferencaCaixa(){
   if(Math.abs(dif)<0.005){
     wrap.style.background='var(--green-dim)';elDif.style.color='var(--green)';elDif.textContent='Bateu certinho!'
   } else if(dif>0){
-    wrap.style.background='var(--green-dim)';elDif.style.color='var(--green)';elDif.textContent='Sobrou R$ '+dif.toFixed(2)
+    wrap.style.background='var(--green-dim)';elDif.style.color='var(--green)';elDif.textContent='Sobrou '+moedaRecibo(dif)
   } else {
-    wrap.style.background='var(--red-dim)';elDif.style.color='var(--red)';elDif.textContent='Faltou R$ '+Math.abs(dif).toFixed(2)
+    wrap.style.background='var(--red-dim)';elDif.style.color='var(--red)';elDif.textContent='Faltou '+moedaRecibo(Math.abs(dif))
   }
 }
 async function confirmarFecharCaixa(){
@@ -1456,6 +1513,10 @@ async function confirmarFecharCaixa(){
     valor_informado:informado,
     valor_esperado:caixaValorEsperado,
     diferenca:dif,
+    total_vendas_dinheiro:caixaConferenciaAtual?caixaConferenciaAtual.vendas:0,
+    total_mesas_dinheiro:caixaConferenciaAtual?caixaConferenciaAtual.mesas:0,
+    total_suprimentos:caixaConferenciaAtual?caixaConferenciaAtual.suprimentos:0,
+    total_sangrias:caixaConferenciaAtual?caixaConferenciaAtual.sangrias:0,
     fechado_em:new Date().toISOString(),
     observacao:obs||null
   }).eq('id',turnoAtual.id)
@@ -1466,6 +1527,7 @@ async function confirmarFecharCaixa(){
   closeModals()
   toast('Caixa fechado!')
   turnoAtual=null
+  caixaConferenciaAtual=null
   atualizarStatusCaixaPdv()
   await renderCaixa()
   var pdvAberto=document.getElementById('sec-pdv')
@@ -2045,7 +2107,7 @@ window.addEventListener('beforeunload', function(e){
 })
 
 // F10 chama o PDV de qualquer tela do sistema (nao so de dentro do PDV, ao contrario
-// dos atalhos F2/F3/F4/F6). F10 nao tem acao padrao no navegador, entao nao chama nada alem disso.
+// dos atalhos F2/F4/F6). F10 nao tem acao padrao no navegador, entao nao chama nada alem disso.
 document.addEventListener('keydown', function(e){
   if(e.key==='F10'){
     if(!userLogado||document.querySelector('.ov.open'))return
@@ -2055,8 +2117,8 @@ document.addEventListener('keydown', function(e){
 })
 
 // Atalhos de teclado do PDV — so funcionam com a tela de Caixa aberta e nenhum modal em cima.
-// Usei teclas de funcao (F2/F3/F4/F6) de proposito: elas nao digitam nada em campos de texto,
-// entao funcionam mesmo com o cursor no campo de busca ou no leitor de codigo de barras.
+// Usei teclas de funcao (F2/F4/F6) de proposito: elas nao digitam nada em campos de texto,
+// entao funcionam mesmo com o cursor no campo de busca.
 document.addEventListener('keydown', function(e){
   var secPdv=document.getElementById('sec-pdv')
   var pdvAtivo=secPdv&&secPdv.classList.contains('on')
@@ -2065,8 +2127,6 @@ document.addEventListener('keydown', function(e){
     e.preventDefault()
     var s=document.getElementById('srch')
     if(s){s.focus();s.select()}
-  } else if(e.key==='F3'){
-    e.preventDefault();toggleBarcode()
   } else if(e.key==='F4'){
     e.preventDefault();abrirResumoPedido()
   } else if(e.key==='F6'){
@@ -2713,47 +2773,6 @@ function delResumoItem(id){
     }
     abrirResumoPedido()
   }, {titulo:'Excluir item?', icone:'🗑️'})
-}
-
-// CAMERA LEITOR
-var html5QrCode = null
-var html5QrCodeModal = null
-
-function toggleCamera(){
-  var area = document.getElementById('camera-area')
-  if(area.style.display === 'none'){
-    area.style.display = 'block'
-    iniciarCamera('camera-reader')
-  } else {
-    pararCamera()
-  }
-}
-
-function iniciarCamera(elementId){
-  try {
-    if(html5QrCode) html5QrCode.stop()
-    html5QrCode = new Html5Qrcode(elementId)
-    html5QrCode.start(
-      {facingMode:'environment'},
-      {fps:10, qrbox:{width:250, height:150}},
-      function(decodedText){
-        var p = prods.find(function(x){ return x.codigo_barras === decodedText })
-        if(p){ addCart(p.id, Number(p.preco_venda)); toast((p.emoji||'') + ' ' + p.nome + ' adicionado!') }
-        else toast('Produto nao encontrado: ' + decodedText, 1)
-      },
-      function(err){}
-    ).catch(function(e){ toast('Erro ao acessar camera: ' + e, 1) })
-  } catch(e){ toast('Camera nao disponivel', 1) }
-}
-
-function pararCamera(){
-  if(html5QrCode){ html5QrCode.stop().catch(function(){}) }
-  document.getElementById('camera-area').style.display = 'none'
-}
-
-function pararCameraModal(){
-  if(html5QrCodeModal){ html5QrCodeModal.stop().catch(function(){}) }
-  closeModals()
 }
 
 // PIX QR CODE

@@ -45,17 +45,19 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg0);color:
 .logo-name{font-size:14px;font-weight:700}
 .logo-sub{font-size:10px;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;margin-top:1px}
 
-.nav-wrap{flex:1;overflow-y:auto;padding:8px 0}
+.nav-wrap{flex:1;overflow-y:auto;padding:28px 0 8px}
 .nav-group{margin-bottom:2px}
-.nav-group-header{width:calc(100% - 12px);display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;color:var(--txt3);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;transition:.15s;border:0;border-left:2px solid transparent;border-radius:var(--rad);margin:1px 6px;user-select:none;background:transparent;font-family:inherit;text-align:left}
+.nav-group-header{width:calc(100% - 12px);display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;color:var(--txt3);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;border:0;border-left:2px solid transparent;border-radius:var(--rad);margin:1px 6px;user-select:none;background:transparent;font-family:inherit;text-align:left}
 .nav-group-header:hover{background:var(--bg2);color:var(--txt2)}
 .nav-group-header.on{background:var(--acc-dim);color:var(--acc);border-left-color:var(--acc)}
 .nav-group-icon{font-size:17px;width:22px;text-align:center;flex-shrink:0}
 .nav-group-label{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .badge{background:var(--red);color:#fff;font-size:10px;padding:1px 6px;border-radius:20px;margin-left:auto;font-weight:700}
 
-.sidebar-toggle{position:fixed;top:52px;left:207px;z-index:710;width:26px;height:36px;border:1px solid var(--border2);border-radius:9px;background:var(--bg2);color:var(--txt2);font-size:22px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:left .2s ease,background .15s,color .15s;box-shadow:var(--shadow);font-family:inherit}
+.sidebar-toggle{position:fixed;top:52px;left:207px;z-index:710;width:26px;height:36px;padding:0;border:1px solid var(--border2);border-radius:9px;background:var(--bg2);color:var(--txt2);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:left .2s ease,background .15s,color .15s;box-shadow:var(--shadow);font-family:inherit}
 .sidebar-toggle:hover,.sidebar-toggle:focus-visible{background:var(--bg3);color:var(--txt1);outline:2px solid var(--acc);outline-offset:1px}
+.sidebar-toggle svg{display:block;width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;transition:transform .2s ease}
+.app.sidebar-collapsed .sidebar-toggle svg{transform:rotate(180deg)}
 .app.sidebar-collapsed .sidebar{width:64px}
 .app.sidebar-collapsed .logo{padding:16px 14px}
 .app.sidebar-collapsed .logo-copy,.app.sidebar-collapsed .nav-group-label,.app.sidebar-collapsed .sf-user>div:last-child,.app.sidebar-collapsed .sf-time,.app.sidebar-collapsed .sidebar-brand-footer{display:none}
@@ -65,10 +67,12 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg0);color:
 .app.sidebar-collapsed .sf-user{margin:0}
 .app.sidebar-collapsed .sidebar-toggle{left:51px}
 
-.context-nav{height:69px;display:flex;align-items:center;flex-shrink:0;padding:0 20px;background:var(--bg1);border-bottom:1px solid var(--border);overflow-x:auto;overflow-y:hidden;scrollbar-width:thin}
+.context-nav{height:69px;display:flex;align-items:center;gap:12px;flex-shrink:0;padding:0 20px;background:var(--bg1);border-bottom:1px solid var(--border);overflow-x:auto;overflow-y:hidden;scrollbar-width:thin}
+.context-nav-title{font-size:14px;color:var(--txt1);white-space:nowrap}
+.context-nav-divider{width:1px;height:24px;background:var(--border2);flex:0 0 1px}
 .context-nav-group{display:none;align-items:center;gap:6px;min-width:max-content}
 .context-nav-group.on{display:flex}
-.context-nav-item{height:34px;padding:0 12px;border-radius:9px;border:1px solid transparent;background:transparent;color:var(--txt2);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;transition:.15s}
+.context-nav-item{height:34px;padding:0 12px;border-radius:9px;border:1px solid transparent;background:transparent;color:var(--txt2);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
 .context-nav-item:hover{background:var(--bg3);color:var(--txt1)}
 .context-nav-item.on{background:var(--acc-dim);border-color:rgba(79,142,247,.35);color:var(--acc)}
 .context-nav-item.danger{color:var(--red)}
@@ -84,9 +88,9 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg0);color:
 .sf-name{font-size:12px;font-weight:600}
 .sf-nivel{font-size:10px;color:var(--txt3);text-transform:uppercase;letter-spacing:.3px}
 .sf-time{font-size:11px;color:var(--txt3);margin-bottom:6px}
-.btn-logout{width:40px;height:40px;padding:0;border-radius:var(--rad);border:1px solid rgba(240,82,82,.25);background:var(--red-dim);cursor:pointer;font-size:18px;font-weight:700;color:var(--red);font-family:inherit;display:flex;align-items:center;justify-content:center;margin-left:auto}
+.btn-logout{width:34px;height:34px;padding:0;border-radius:9px;border:1px solid rgba(240,82,82,.25);background:var(--red-dim);cursor:pointer;color:var(--red);font-family:inherit;display:flex;align-items:center;justify-content:center;margin-left:auto}
 .btn-logout:hover,.btn-logout:focus-visible{background:rgba(240,82,82,.2);outline:2px solid var(--red);outline-offset:1px}
-.btn-logout svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+.btn-logout svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
 .sidebar-brand-footer{text-align:center;font-size:10px;color:var(--txt3);margin-top:10px}
 
 /* MAIN */
@@ -103,6 +107,13 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg0);color:
 /* Atalhos do PDV: ficam junto da operacao, logo acima da busca de produtos. */
 .atalhos-global{min-height:28px;padding:5px 10px;border:1px solid var(--border);border-radius:8px;font-size:11px;font-weight:600;line-height:1.35;color:var(--txt2);background:var(--bg1);display:flex;align-items:center;justify-content:center;text-align:center;flex-shrink:0;pointer-events:none;user-select:none}
 @media print{.atalhos-global{display:none!important}}
+.search-box-unified{position:relative;display:block}
+.search-box-unified .search-input{width:100%}
+.search-assist{display:flex;align-items:center;gap:8px;max-height:0;opacity:0;overflow:hidden;transition:max-height .18s ease,opacity .18s ease,margin .18s ease;margin:0 2px;color:var(--txt3);font-size:11px}
+.search-box-unified:focus-within .search-assist{max-height:28px;opacity:1;margin-top:7px}
+.search-assist span{display:inline-flex;align-items:center;gap:5px;padding-right:10px;white-space:nowrap}
+.search-assist span+span{border-left:1px solid var(--border2);padding-left:10px}
+.search-assist b{color:var(--acc);font-size:12px}
 
 /* BUTTONS */
 .btn{padding:7px 14px;border-radius:var(--rad);border:1px solid var(--border2);background:var(--bg3);cursor:pointer;font-size:13px;font-weight:500;color:var(--txt1);display:inline-flex;align-items:center;gap:6px;transition:.15s;font-family:inherit}
@@ -118,6 +129,14 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg0);color:
 .modal-caixa-abertura{max-width:420px;text-align:left}
 .modal-caixa-abertura .modal-icon{width:48px;height:48px;border-radius:14px;background:var(--green-dim);border:1px solid rgba(62,207,142,.28);display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:14px}
 .modal-caixa-abertura .modal-help{font-size:13px;line-height:1.5;color:var(--txt2);margin:8px 0 18px}
+.cash-reconciliation{border:1px solid var(--border);border-radius:var(--rad);background:var(--bg2);padding:7px 12px;margin:12px 0 16px}
+.cash-reconciliation>div{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:7px 0;font-size:12px;color:var(--txt2);border-bottom:1px solid var(--border)}
+.cash-reconciliation>div:last-child{border-bottom:0}
+.cash-reconciliation strong{color:var(--txt1);white-space:nowrap}
+.cash-reconciliation .positive{color:var(--green)}
+.cash-reconciliation .negative{color:var(--red)}
+.cash-reconciliation .cash-reconciliation-total{font-size:14px;color:var(--txt1);padding-top:10px}
+.cash-reconciliation-total strong{color:var(--green);font-size:18px}
 
 /* PDV */
 .pdv-layout{display:grid;grid-template-columns:1fr 320px;gap:14px;flex:1;overflow:hidden;padding:14px 20px}
@@ -334,9 +353,6 @@ tr:hover td{background:var(--bg2)}
 .pix-box canvas { margin: 12px auto; display: block; border: 4px solid #000; border-radius: 8px; }
 .pix-code { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--rad); padding: 10px; font-family: monospace; font-size: 11px; word-break: break-all; color: var(--txt2); margin: 10px 0; text-align: left; max-height: 80px; overflow-y: auto; }
 
-/* CAMERA LEITOR */
-#camera-reader { width: 100%; border-radius: var(--rad); overflow: hidden; }
-
 /* RELATORIO */
 .rel-filter{display:flex;gap:8px;margin-bottom:16px;align-items:center}
 .rel-filter select,.rel-filter input{padding:7px 10px;border-radius:var(--rad);border:1px solid var(--border);background:var(--bg2);font-size:13px;color:var(--txt1);outline:none;font-family:inherit}
@@ -376,10 +392,12 @@ tr:hover td{background:var(--bg2)}
   .app.sidebar-collapsed .nav-group-header .badge{position:static;margin-left:auto;padding:1px 6px}
   .app.sidebar-collapsed .sf{padding:12px 14px;display:block}
   .app.sidebar-collapsed .sf-user{margin-bottom:8px}
+  .nav-wrap{padding-top:28px}
 
   /* Atalho de teclado nao faz sentido sem teclado fisico (celular) */
   .atalhos-global{display:none!important}
-  .context-nav{height:54px;padding:8px 12px 8px 54px}
+  .context-nav{height:54px;padding:8px 12px 8px 54px;gap:9px}
+  .context-nav-title{font-size:13px}
 
   /* Topbar: abre espaco pro botao hamburger e permite quebrar linha se tiver varios botoes */
   .topbar{padding:12px 14px;flex-wrap:wrap;gap:8px;row-gap:6px}
@@ -404,4 +422,10 @@ tr:hover td{background:var(--bg2)}
   /* Tabelas (Relatorios/Financeiro/Estoque): em vez de cortar as colunas, rola de lado */
   .tbl{overflow-x:auto;overflow-y:hidden}
   .tbl table{width:max-content;min-width:100%}
+}
+
+@media (max-width:480px){
+  .search-box-unified:focus-within .search-assist{max-height:52px}
+  .search-assist{flex-direction:column;align-items:flex-start;gap:3px}
+  .search-assist span+span{border-left:0;padding-left:0}
 }
