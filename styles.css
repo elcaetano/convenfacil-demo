@@ -77,7 +77,9 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg0);color:
 .context-nav-group.on{display:flex}
 .context-nav-item{height:34px;padding:0 12px;border-radius:9px;border:1px solid transparent;background:transparent;color:var(--txt2);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
 .context-nav-item:hover{background:var(--bg3);color:var(--txt1)}
-.context-nav-item.on{background:var(--acc-dim);border-color:rgba(79,142,247,.35);color:var(--acc)}
+.context-nav-item.on{background:transparent;border-color:transparent;border-bottom-color:var(--acc);border-radius:0;color:var(--acc)}
+.context-nav-item.on:hover{background:transparent;border-radius:0;color:var(--acc)}
+.context-nav-item:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
 .context-nav-item.danger{color:var(--red)}
 
 /* MODO MOBILE — botao hamburger (fixo, abre/fecha a gaveta do menu lateral) e overlay escuro */
@@ -128,6 +130,7 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg0);color:
 .btn.grn{background:var(--green-dim);color:var(--green);border-color:rgba(62,207,142,.3)}
 .btn.yellow{background:var(--yellow-dim);color:var(--yellow);border-color:rgba(245,200,66,.3)}
 .btn.sm{padding:4px 10px;font-size:12px}
+.btn-icon{width:36px;height:34px;padding:0;justify-content:center;font-size:15px}
 .btn:disabled{opacity:.45;cursor:not-allowed;pointer-events:none}
 
 .modal-caixa-abertura{max-width:420px;text-align:left}
@@ -141,6 +144,19 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg0);color:
 .cash-reconciliation .negative{color:var(--red)}
 .cash-reconciliation .cash-reconciliation-total{font-size:14px;color:var(--txt1);padding-top:10px}
 .cash-reconciliation-total strong{color:var(--green);font-size:18px}
+.modal-fechar-caixa{max-width:400px;padding:18px 20px;max-height:calc(100dvh - 20px)}
+.modal-fechar-caixa h2{margin-bottom:9px}
+.modal-fechar-caixa .modal-help{font-size:12px;line-height:1.4;color:var(--txt2);margin:0 0 9px}
+.modal-fechar-caixa .cash-reconciliation{padding:3px 10px;margin:8px 0 10px}
+.modal-fechar-caixa .cash-reconciliation>div{padding:5px 0;font-size:11.5px}
+.modal-fechar-caixa .cash-reconciliation .cash-reconciliation-total{font-size:13px;padding-top:7px}
+.modal-fechar-caixa .cash-reconciliation-total strong{font-size:17px}
+.modal-fechar-caixa .fg{margin-bottom:9px}
+.modal-fechar-caixa .fg input{padding:8px 10px}
+.cash-difference{display:none;margin:7px 0;padding:7px;border-radius:var(--rad);text-align:center}
+.cash-difference-label{font-size:10px;color:var(--txt3);text-transform:uppercase;margin-bottom:2px}
+.cash-difference-value{font-size:18px;font-weight:800}
+.modal-fechar-caixa .modal-ft{justify-content:center;margin-top:10px;padding-top:10px}
 
 /* PDV */
 .pdv-layout{display:grid;grid-template-columns:1fr 320px;gap:14px;flex:1;overflow:hidden;padding:14px 20px}
@@ -439,6 +455,7 @@ tr:hover td{background:var(--bg2)}
   /* Formularios dos modais: 1 coluna so, mais facil de preencher com o dedo */
   .fgrid.c2,.fgrid.c3{grid-template-columns:1fr}
   .modal{padding:18px}
+  .modal-fechar-caixa{padding:16px;max-height:calc(100dvh - 16px)}
 
   /* Tabelas (Relatorios/Financeiro/Estoque): em vez de cortar as colunas, rola de lado */
   .tbl{overflow-x:auto;overflow-y:hidden}
