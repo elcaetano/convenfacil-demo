@@ -184,7 +184,7 @@ async function doLogin(event){
     // So guarda o EMAIL pra facilitar o proximo login (autopreenche o campo).
     // A senha nunca fica guardada em lugar nenhum do app.
     try{localStorage.setItem('ultimo_login_email',email)}catch(e){}
-    userLogado=perfil;iniciarApp()
+    userLogado=perfil;await iniciarApp()
   }catch(e){err.textContent='Erro de conexao';err.style.display='block';btn.textContent='Entrar no sistema';btn.disabled=false}
 }
 
@@ -196,11 +196,11 @@ async function restaurarSessao(){
     if(error||!data||!data.user)return
     const perfil=await carregarPerfilLogado(data.user)
     if(!perfil){await db.auth.signOut();return}
-    userLogado=perfil;iniciarApp()
+    userLogado=perfil;await iniciarApp()
   }catch(e){}
 }
 
-function iniciarApp(){
+async function iniciarApp(){
   document.getElementById('login-wrap').style.display='none'
   document.getElementById('app').classList.add('on')
   restaurarEstadoSidebar()
@@ -226,10 +226,13 @@ function iniciarApp(){
   tick();setInterval(tick,30000)
   restaurarRascunhoCart()
   iniciarMonitorInatividade()
+  // O turno pertence ao caixa da loja e continua aberto no banco mesmo se o navegador
+  // for fechado. Restaura esse estado antes de decidir qual tela/modal deve aparecer.
+  try{await carregarTurnoAtual()}catch(e){atualizarStatusCaixaPdv()}
   // Master nao vende nada, so administra as lojas — entao cai direto no Painel Master.
   // Todo mundo mais (dono da loja, gerente, operador) cai no PDV, que e o trabalho do dia a dia.
-  if(userLogado.nivel==='superadmin')go('superadmin')
-  else go('pdv',document.getElementById('nav-pdv'))
+  if(userLogado.nivel==='superadmin')await go('superadmin')
+  else await go('pdv',document.getElementById('nav-pdv'))
 }
 
 var funcsAtivas={}
@@ -368,7 +371,7 @@ function toggleSidebar(){
 }
 
 async function go(id,el){
-  if(id==='pdv'&&userLogado&&userLogado.nivel!=='superadmin'){
+  if(id==='pdv'&&userLogado){
     var caixaAberto=await garantirTurnoCaixaAberto()
     if(!caixaAberto)return
   }
@@ -671,7 +674,7 @@ function finalizarVenda(){
 
 async function confirmarPay(metodo){
   if(!mesaPagamentoAtivo && !cart.length){toast('Adicione produtos ao pedido',1);return}
-  if(!mesaPagamentoAtivo&&userLogado&&userLogado.nivel!=='superadmin'){
+  if(!mesaPagamentoAtivo&&userLogado){
     var caixaAberto=await garantirTurnoCaixaAberto(true)
     if(!caixaAberto)return
   }
@@ -803,7 +806,7 @@ function confirmarFiado(){
 }
 
 async function confirmarVenda(){
-  if(userLogado&&userLogado.nivel!=='superadmin'){
+  if(userLogado){
     var caixaAberto=await garantirTurnoCaixaAberto(true)
     if(!caixaAberto)return
   }
@@ -819,7 +822,7 @@ async function confirmarVenda(){
 
 async function pay(metodo,cpf,imprimirRecibo){
   if(!cart.length){toast('Adicione produtos',1);return}
-  if(userLogado&&userLogado.nivel!=='superadmin'){
+  if(userLogado){
     var caixaAberto=await garantirTurnoCaixaAberto(true)
     if(!caixaAberto)return
   }
@@ -1525,14 +1528,23 @@ async function receberConta(id){
 var turnoAtual=null
 var caixaValorEsperado=0
 var caixaConferenciaAtual=null
-var verificandoTurnoCaixa=false
+var carregamentoTurnoAtual=null
 
 async function carregarTurnoAtual(){
-  var res=await scopeCid(db.from('turnos_caixa').select('*')).eq('status','aberto').order('aberto_em',{ascending:false}).limit(1)
-  if(res.error){console.error(res.error);throw res.error}
-  turnoAtual=(res.data&&res.data[0])||null
-  atualizarStatusCaixaPdv()
-  return turnoAtual
+  if(carregamentoTurnoAtual)return carregamentoTurnoAtual
+  carregamentoTurnoAtual=(async function(){
+    var consulta=db.from('turnos_caixa').select('*')
+    // O Master usa apenas o caixa de demonstracao (cliente_id nulo); nunca deve capturar
+    // por engano o turno aberto de uma loja cliente.
+    consulta=meuCid()?consulta.eq('cliente_id',meuCid()):consulta.is('cliente_id',null)
+    var res=await consulta.eq('status','aberto').order('aberto_em',{ascending:true}).limit(1)
+    if(res.error){console.error(res.error);throw res.error}
+    turnoAtual=(res.data&&res.data[0])||null
+    atualizarStatusCaixaPdv()
+    return turnoAtual
+  })()
+  try{return await carregamentoTurnoAtual}
+  finally{carregamentoTurnoAtual=null}
 }
 
 function atualizarStatusCaixaPdv(){
@@ -1576,8 +1588,6 @@ function cancelarAberturaCaixa(){
 
 async function garantirTurnoCaixaAberto(forcarConsulta){
   if(!forcarConsulta&&turnoAtual&&turnoAtual.status==='aberto'){atualizarStatusCaixaPdv();return true}
-  if(verificandoTurnoCaixa)return false
-  verificandoTurnoCaixa=true
   try{
     await carregarTurnoAtual()
     if(turnoAtual)return true
@@ -1589,7 +1599,7 @@ async function garantirTurnoCaixaAberto(forcarConsulta){
   }catch(e){
     toast('Nao foi possivel verificar o caixa',1)
     return false
-  }finally{verificandoTurnoCaixa=false}
+  }
 }
 
 async function renderCaixa(){
@@ -1599,13 +1609,35 @@ async function renderCaixa(){
 async function confirmarAberturaCaixa(){
   var campo=document.getElementById('abertura-caixa-valor')
   var valorRaw=campo?campo.value:''
-  var valor=parseFloat(valorRaw)
-  if(valorRaw===''||isNaN(valor)||valor<0){toast('Informe o valor de abertura',1);if(campo)campo.focus();return}
   var botao=document.getElementById('btn-confirmar-abertura')
   if(botao){botao.disabled=true;botao.textContent='Abrindo caixa...'}
   try{
+    // Confere novamente no servidor: evita criar outro turno ao reabrir o navegador
+    // ou quando duas abas tentam abrir o mesmo caixa quase ao mesmo tempo.
+    await carregarTurnoAtual()
+    if(turnoAtual){
+      cancelarAberturaCaixa()
+      toast('Caixa aberto recuperado. O pedido pode ser finalizado.')
+      await go('pdv',document.getElementById('nav-pdv'))
+      return
+    }
+    var valor=parseFloat(valorRaw)
+    if(valorRaw===''||isNaN(valor)||valor<0){toast('Informe o valor de abertura',1);if(campo)campo.focus();return}
     var res=await db.from('turnos_caixa').insert({cliente_id:meuCid(),usuario_abertura:userLogado.nome,valor_abertura:valor,status:'aberto'}).select().single()
-    if(res.error){console.error(res.error);toast('Erro ao abrir caixa',1);return}
+    if(res.error){
+      // A restricao do banco pode detectar que outra aba acabou de abrir o caixa.
+      // Nesse caso, recupera o turno vencedor em vez de pedir outra abertura.
+      if(res.error.code==='23505'){
+        await carregarTurnoAtual()
+        if(turnoAtual){
+          cancelarAberturaCaixa()
+          toast('Caixa aberto recuperado. O pedido pode ser finalizado.')
+          await go('pdv',document.getElementById('nav-pdv'))
+          return
+        }
+      }
+      console.error(res.error);toast('Erro ao abrir caixa',1);return
+    }
     turnoAtual=res.data
     atualizarStatusCaixaPdv()
     cancelarAberturaCaixa()
@@ -2954,7 +2986,7 @@ function confirmarRecebimentoPIX(){
 
 // RESUMO DO PEDIDO
 async function abrirResumoPedido(){
-  if(userLogado&&userLogado.nivel!=='superadmin'){
+  if(userLogado){
     var caixaAberto=await garantirTurnoCaixaAberto(true)
     if(!caixaAberto)return
   }
