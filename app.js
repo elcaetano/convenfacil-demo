@@ -8,6 +8,7 @@ const {createClient}=supabase
 const db=createClient(SURL,SKEY,{auth:{storage:window.sessionStorage,persistSession:true,autoRefreshToken:true}})
 
 let prods=[],cart=[],cartSnapshot=[],catA='Todos',promos=[],userLogado=null,payMetodo=null
+let ultimaVendaRecibo=null,pagamentoDinheiroPendente=null,vendaEmProcessamento=false
 let excecoes=[]
 const INACTIVITY_LIMIT_MS=30*60*1000
 let inactivityTimer=null
@@ -288,7 +289,9 @@ async function doLogout(motivo){
   logoutEmAndamento=true
   clearTimeout(inactivityTimer)
   try{await db.auth.signOut({scope:'local'})}catch(e){}
-  userLogado=null;cart=[]
+  userLogado=null;cart=[];cartSnapshot=[]
+  ultimaVendaRecibo=null;pagamentoDinheiroPendente=null;vendaEmProcessamento=false
+  atualizarBotaoUltimoRecibo()
   document.getElementById('app').classList.remove('on')
   document.getElementById('login-wrap').style.display='flex'
   // Mantem so o email preenchido (facilita o proximo login); a senha some sempre.
@@ -606,6 +609,7 @@ function confirmarPay(metodo){
 
 function abrirConfirmar(metodo){
   payMetodo=metodo
+  if(metodo!=='Dinheiro')pagamentoDinheiroPendente=null
   // Fechamento de mesa reaproveita os mesmos modais de pagamento, mas o encerramento
   // e outro (comandas/mesas, nao vendas) — nunca passa pelo NF/CPF/pay() do PDV.
   if(mesaPagamentoAtivo){
@@ -691,9 +695,14 @@ function validarCPFStr(cpf){
   return r===parseInt(c[10])
 }
 
+function emitirReciboSemCPF(){
+  document.getElementById('nf-modal').style.display='none'
+  pay(payMetodo,'',true)
+}
+
 function nfNao(){
   document.getElementById('nf-modal').style.display='none'
-  pay(payMetodo,'')
+  pay(payMetodo,'',false)
 }
 
 function confirmarFiado(){
@@ -722,38 +731,90 @@ function confirmarVenda(){
 
 async function pay(metodo,cpf,imprimirRecibo){
   if(!cart.length){toast('Adicione produtos',1);return}
-  var total=cart.reduce(function(a,c){return a+Number(c.preco_final)*c.qty},0)
-  var res=await db.from('vendas').insert({total:total,forma_pagamento:metodo,cliente_id:meuCid()}).select().single()
-  if(res.error){toast('Erro ao registrar venda',1);return}
-  var venda=res.data
-  await db.from('itens_venda').insert(cart.map(function(c){
-    return{venda_id:venda.id,produto_id:c.id,quantidade:c.qty,preco_unitario:Number(c.preco_final),cliente_id:meuCid()}
-  }))
-  for(var i=0;i<cart.length;i++){
-    var c=cart[i]
-    var p=prods.find(function(x){return x.id===c.id})
-    if(p){var ne=p.estoque-c.qty;await db.from('produtos').update({estoque:ne}).eq('id',c.id);p.estoque=ne}
+  if(vendaEmProcessamento){toast('Aguarde, a venda esta sendo registrada',1);return}
+  vendaEmProcessamento=true
+  var janelaRecibo=imprimirRecibo?window.open('','_blank','width=520,height=820'):null
+  var itensVenda=cart.map(function(c){
+    return Object.assign({},c,{qty:Number(c.qty),preco_final:Number(c.preco_final),preco_venda:Number(c.preco_venda||c.preco_final)})
+  })
+  var total=itensVenda.reduce(function(a,c){return a+c.preco_final*c.qty},0)
+  var dadosDinheiro=metodo==='Dinheiro'&&pagamentoDinheiroPendente?pagamentoDinheiroPendente:null
+  try{
+    var res=await db.from('vendas').insert({
+      total:total,
+      forma_pagamento:metodo,
+      cliente_id:meuCid(),
+      cpf_consumidor:cpf||null,
+      usuario_nome:(userLogado&&userLogado.nome)||'Operador',
+      valor_recebido:dadosDinheiro?dadosDinheiro.recebido:null,
+      troco:dadosDinheiro?dadosDinheiro.troco:null
+    }).select().single()
+    if(res.error)throw res.error
+    var venda=res.data
+    var itensRes=await db.from('itens_venda').insert(itensVenda.map(function(c){
+      return{
+        venda_id:venda.id,
+        produto_id:c.id,
+        quantidade:c.qty,
+        preco_unitario:c.preco_final,
+        produto_nome:c.nome,
+        preco_original:c.preco_venda,
+        cliente_id:meuCid()
+      }
+    }))
+    if(itensRes.error)throw itensRes.error
+    for(var i=0;i<itensVenda.length;i++){
+      var c=itensVenda[i]
+      var p=prods.find(function(x){return x.id===c.id})
+      if(p){
+        var ne=p.estoque-c.qty
+        var estoqueRes=await db.from('produtos').update({estoque:ne}).eq('id',c.id)
+        if(estoqueRes.error)throw estoqueRes.error
+        p.estoque=ne
+      }
+    }
+    // Fiado: lancar automaticamente em Contas a Receber, vinculado ao cliente e com a data prometida
+    // (metodo vem como "Fiado - Nome do cliente", por isso o indexOf em vez de igualdade exata)
+    if(metodo.indexOf('Fiado')===0&&payClienteFiado){
+      var fiadoRes=await db.from('contas_receber').insert({
+        descricao:'Fiado - '+payClienteFiado.nome,
+        cliente_nome:payClienteFiado.nome,
+        cliente_fiado_id:payClienteFiado.id,
+        venda_id:venda.id,
+        valor:total,
+        vencimento:payClienteFiado.dataPromessa,
+        cliente_id:meuCid()
+      })
+      if(fiadoRes.error)throw fiadoRes.error
+      payClienteFiado=null
+    }
+    cartSnapshot=itensVenda.slice()
+    ultimaVendaRecibo={
+      id:venda.id,
+      criado_em:venda.criado_em,
+      total:total,
+      forma_pagamento:metodo,
+      cpf_consumidor:cpf||'',
+      usuario_nome:(userLogado&&userLogado.nome)||'Operador',
+      valor_recebido:dadosDinheiro?dadosDinheiro.recebido:null,
+      troco:dadosDinheiro?dadosDinheiro.troco:null,
+      itens:itensVenda
+    }
+    atualizarBotaoUltimoRecibo()
+    if(imprimirRecibo) imprimirReciboVenda(ultimaVendaRecibo,janelaRecibo)
+    else if(janelaRecibo)janelaRecibo.close()
+    var msg='Pagamento '+metodo+' - R$ '+total.toFixed(2)+'!'
+    if(cpf)msg+=' | CPF: '+cpf
+    toast(msg)
+    cart=[];renderCart();renderPDV();updateBadge()
+  }catch(erro){
+    console.error(erro)
+    if(janelaRecibo)janelaRecibo.close()
+    toast('Nao foi possivel concluir a venda. Tente novamente.',1)
+  }finally{
+    pagamentoDinheiroPendente=null
+    vendaEmProcessamento=false
   }
-  // Fiado: lancar automaticamente em Contas a Receber, vinculado ao cliente e com a data prometida
-  // (metodo vem como "Fiado - Nome do cliente", por isso o indexOf em vez de igualdade exata)
-  if(metodo.indexOf('Fiado')===0&&payClienteFiado){
-    await db.from('contas_receber').insert({
-      descricao:'Fiado - '+payClienteFiado.nome,
-      cliente_nome:payClienteFiado.nome,
-      cliente_fiado_id:payClienteFiado.id,
-      venda_id:venda.id,
-      valor:total,
-      vencimento:payClienteFiado.dataPromessa,
-      cliente_id:meuCid()
-    })
-    payClienteFiado=null
-  }
-  var msg='Pagamento '+metodo+' - R$ '+total.toFixed(2)+'!'
-  if(cpf)msg+=' | CPF: '+cpf
-  toast(msg)
-  cartSnapshot=cart.slice()
-  if(imprimirRecibo&&cpf) imprimirReciboComCPF(cpf,metodo,total,venda.id,venda.criado_em)
-  cart=[];renderCart();renderPDV();updateBadge()
 }
 
 function escaparHtmlRecibo(valor){
@@ -769,7 +830,14 @@ function moedaRecibo(valor){
   return Number(valor||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})
 }
 
-function montarHtmlReciboComCPF(cpf,metodo,total,vendaId,criadoEm,itens){
+function montarHtmlReciboVenda(dados){
+  dados=dados||{}
+  var cpf=dados.cpf_consumidor||''
+  var metodo=dados.forma_pagamento||'Nao informado'
+  var total=Number(dados.total||0)
+  var vendaId=dados.id
+  var criadoEm=dados.criado_em
+  var itens=dados.itens
   var loja=localStorage.getItem('nome_loja')||'CONVENFÁCIL'
   var cnpj=localStorage.getItem('cnpj_loja')||''
   var telefone=localStorage.getItem('tel_loja')||''
@@ -781,7 +849,7 @@ function montarHtmlReciboComCPF(cpf,metodo,total,vendaId,criadoEm,itens){
   var dt=dataVenda.toLocaleDateString('pt-BR')+' às '+dataVenda.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})
   var numeroRecibo=vendaId?String(vendaId).replace(/-/g,'').slice(0,8).toUpperCase():String(Date.now()).slice(-8)
   itens=Array.isArray(itens)?itens:[]
-  var subtotal=itens.reduce(function(a,c){return a+Number(c.preco_venda||c.preco_final)*c.qty},0)
+  var subtotal=itens.reduce(function(a,c){return a+Number(c.preco_venda||c.preco_final)*Number(c.qty)},0)
   var desconto=Math.max(0,subtotal-Number(total))
   var itensHTML=itens.map(function(c){
     var nome=escaparHtmlRecibo(c.nome)
@@ -839,13 +907,16 @@ function montarHtmlReciboComCPF(cpf,metodo,total,vendaId,criadoEm,itens){
         '<div><div class="doc-title">Recibo de venda</div><div class="muted">'+dt+'</div></div>'+
         '<div class="doc-number"><span class="muted">Nº do recibo</span><br><strong>'+numeroRecibo+'</strong></div>'+
       '</section>'+
-      '<section class="customer"><span class="customer-label">CPF do consumidor</span><span class="customer-value">'+escaparHtmlRecibo(cpf)+'</span></section>'+
+      (cpf?'<section class="customer"><span class="customer-label">CPF do consumidor</span><span class="customer-value">'+escaparHtmlRecibo(cpf)+'</span></section>':'')+
       '<table><thead><tr><th>Descrição</th><th>Valor</th></tr></thead><tbody>'+itensHTML+'</tbody></table>'+
       '<section class="summary">'+
         '<div class="summary-row"><span>Subtotal</span><strong>'+moedaRecibo(subtotal)+'</strong></div>'+
         (desconto>0.009?'<div class="summary-row discount"><span>Desconto</span><span>- '+moedaRecibo(desconto)+'</span></div>':'')+
         '<div class="grand-total"><span>Total</span><span>'+moedaRecibo(total)+'</span></div>'+
         '<div class="payment"><span>Pagamento</span><span>'+escaparHtmlRecibo(metodo)+'</span></div>'+
+        (dados.valor_recebido!=null?'<div class="payment"><span>Valor recebido</span><span>'+moedaRecibo(dados.valor_recebido)+'</span></div>':'')+
+        (dados.troco!=null?'<div class="payment"><span>Troco</span><span>'+moedaRecibo(dados.troco)+'</span></div>':'')+
+        (dados.usuario_nome?'<div class="payment"><span>Operador</span><span>'+escaparHtmlRecibo(dados.usuario_nome)+'</span></div>':'')+
       '</section>'+
       '<hr class="divider">'+
       '<footer class="footer">'+
@@ -856,9 +927,51 @@ function montarHtmlReciboComCPF(cpf,metodo,total,vendaId,criadoEm,itens){
     '</body></html>'
 }
 
-function imprimirReciboComCPF(cpf,metodo,total,vendaId,criadoEm){
-  var html=montarHtmlReciboComCPF(cpf,metodo,total,vendaId,criadoEm,cartSnapshot)
-  imprimirComPreview(html,'Recibo pronto para imprimir')
+function imprimirReciboVenda(dados,janelaAberta){
+  var html=montarHtmlReciboVenda(dados)
+  imprimirComPreview(html,'Recibo pronto para imprimir',janelaAberta)
+}
+
+function atualizarBotaoUltimoRecibo(){
+  var btn=document.getElementById('btn-imprimir-ultimo-recibo')
+  if(btn)btn.disabled=!ultimaVendaRecibo
+}
+
+function imprimirUltimoRecibo(){
+  if(!ultimaVendaRecibo){toast('Nenhuma venda recente para imprimir',1);return}
+  imprimirReciboVenda(ultimaVendaRecibo)
+}
+
+async function reimprimirVenda(vendaId){
+  if(!vendaId){toast('Venda nao identificada',1);return}
+  var janela=window.open('','_blank','width=520,height=820')
+  try{
+    var resultados=await Promise.all([
+      scopeCid(db.from('vendas').select('*')).eq('id',vendaId).single(),
+      scopeCid(db.from('itens_venda').select('produto_id,quantidade,preco_unitario,produto_nome,preco_original')).eq('venda_id',vendaId)
+    ])
+    if(resultados[0].error)throw resultados[0].error
+    if(resultados[1].error)throw resultados[1].error
+    var venda=resultados[0].data
+    var itens=(resultados[1].data||[]).map(function(item){
+      var produto=prods.find(function(p){return p.id===item.produto_id})
+      return{
+        nome:item.produto_nome||(produto&&produto.nome)||'Produto',
+        qty:Number(item.quantidade),
+        preco_final:Number(item.preco_unitario),
+        preco_venda:Number(item.preco_original||item.preco_unitario)
+      }
+    })
+    if(!itens.length)throw new Error('Venda sem itens disponiveis para reimpressao')
+    var dados=Object.assign({},venda,{itens:itens})
+    ultimaVendaRecibo=dados
+    atualizarBotaoUltimoRecibo()
+    imprimirReciboVenda(dados,janela)
+  }catch(erro){
+    console.error(erro)
+    if(janela)janela.close()
+    toast('Nao foi possivel reimprimir este recibo',1)
+  }
 }
 
 function clearCart(){
@@ -1192,7 +1305,11 @@ async function renderFin(){
   if(!ult.length){uv.innerHTML='<div class="empty" style="padding:12px 0">Nenhuma venda</div>';return}
   uv.innerHTML=ult.map(function(v){
     var dt=new Date(v.criado_em)
-    return'<div class="lrow"><span>'+dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})+' - '+v.forma_pagamento+'</span><strong style="color:var(--green)">R$ '+Number(v.total).toFixed(2)+'</strong></div>'
+    return'<div class="receipt-history-row">'+
+      '<div class="receipt-history-info"><span>'+dt.toLocaleDateString('pt-BR')+' '+dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})+'</span><small>'+escaparHtmlRecibo(v.forma_pagamento||'Nao informado')+(v.usuario_nome?' • '+escaparHtmlRecibo(v.usuario_nome):'')+'</small></div>'+
+      '<strong>R$ '+Number(v.total).toFixed(2)+'</strong>'+
+      '<button type="button" class="btn receipt-reprint" onclick="reimprimirVenda(\''+v.id+'\')" title="Reimprimir recibo">&#x1F5A8; Reimprimir</button>'+
+    '</div>'
   }).join('')
 }
 
@@ -1549,8 +1666,8 @@ async function renderRelatorio(){
     var vendas=res.data||[]
     var total=vendas.reduce(function(a,v){return a+Number(v.total)},0)
     el.innerHTML='<div class="mc b" style="margin-bottom:16px"><div class="lbl">Total do periodo</div><div class="val">R$ '+total.toFixed(2)+'</div><div class="sub">'+vendas.length+' vendas</div></div>'+
-      '<div class="tbl"><table><thead><tr><th>Data/Hora</th><th>Forma</th><th>Total</th></tr></thead><tbody>'+
-      (vendas.length?vendas.map(function(v){return'<tr><td>'+new Date(v.criado_em).toLocaleString('pt-BR')+'</td><td>'+v.forma_pagamento+'</td><td style="color:var(--green);font-weight:600">R$ '+Number(v.total).toFixed(2)+'</td></tr>'}).join(''):'<tr><td colspan="3"><div class="empty">Nenhuma venda</div></td></tr>')+
+      '<div class="tbl"><table><thead><tr><th>Data/Hora</th><th>Forma</th><th>Operador</th><th>Total</th><th>Recibo</th></tr></thead><tbody>'+
+      (vendas.length?vendas.map(function(v){return'<tr><td>'+new Date(v.criado_em).toLocaleString('pt-BR')+'</td><td>'+escaparHtmlRecibo(v.forma_pagamento||'Nao informado')+'</td><td>'+escaparHtmlRecibo(v.usuario_nome||'-')+'</td><td style="color:var(--green);font-weight:600">R$ '+Number(v.total).toFixed(2)+'</td><td><button type="button" class="btn receipt-reprint" onclick="reimprimirVenda(\''+v.id+'\')">&#x1F5A8; Reimprimir</button></td></tr>'}).join(''):'<tr><td colspan="5"><div class="empty">Nenhuma venda</div></td></tr>')+
       '</tbody></table></div>'
   } else if(tipo==='vendas_forma'){
     // Agrupa as vendas do PDV (balcao) por forma de pagamento. Obs: fechamentos de mesa com
@@ -2130,7 +2247,7 @@ document.addEventListener('keydown', function(e){
   } else if(e.key==='F4'){
     e.preventDefault();abrirResumoPedido()
   } else if(e.key==='F6'){
-    e.preventDefault();imprimirCupom()
+    e.preventDefault();imprimirUltimoRecibo()
   } else if(e.ctrlKey&&e.key==='Delete'){
     // Ctrl+Delete de proposito (nao uma tecla solta) pra "Limpar pedido" nao disparar sem querer
     e.preventDefault();clearCart()
@@ -2706,6 +2823,7 @@ function confirmarTroco(){
     divisaoEmAndamento=false
     return
   }
+  pagamentoDinheiroPendente={recebido:recebido,troco:Math.max(0,recebido-total)}
   confirmarPay('Dinheiro')
 }
 
@@ -2837,55 +2955,6 @@ function copiarPIX(){
   }).catch(function(){
     toast('Erro ao copiar', 1)
   })
-}
-
-// CUPOM TERMICO
-function imprimirCupom(){
-  var itens = cart.length ? cart : cartSnapshot
-  if(!itens || !itens.length){ toast('Adicione produtos ao pedido', 1); return }
-  var total = itens.reduce(function(a,c){ return a + Number(c.preco_final)*c.qty }, 0)
-  var orig = itens.reduce(function(a,c){ return a + Number(c.preco_venda)*c.qty }, 0)
-  var desc = orig - total
-  var now = new Date()
-  var dt = now.toLocaleDateString('pt-BR') + ' ' + now.toLocaleTimeString('pt-BR')
-  var loja = localStorage.getItem('nome_loja') || 'CONVENFACIL'
-  var cnpj = localStorage.getItem('cnpj_loja') || ''
-  var rodape = localStorage.getItem('rodape_cupom') || 'Obrigado pela preferencia!'
-  var linhas = itens.map(function(c){
-    var nome = c.nome.substring(0,24).padEnd(24)
-    var qtd = c.qty + 'x'
-    var unit = 'R$' + Number(c.preco_final).toFixed(2)
-    var subtot = 'R$' + (Number(c.preco_final)*c.qty).toFixed(2)
-    return '<div>'+nome+'</div><div style="display:flex;justify-content:space-between"><span>'+qtd+' x '+unit+'</span><span>'+subtot+'</span></div>'
-  }).join('')
-
-  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8">'+
-    '<style>'+
-    '*{margin:0;padding:0;box-sizing:border-box}'+
-    'body{font-family:"Courier New",monospace;font-size:11px;width:80mm;background:#fff;color:#000;padding:3mm}'+
-    '.c{text-align:center}.r{text-align:right}.b{font-weight:bold}.g{font-size:14px}'+
-    '.linha{border-top:1px dashed #000;margin:4px 0}'+
-    '@media print{body{width:80mm;-webkit-print-color-adjust:exact;print-color-adjust:exact}}'+
-    '</style></head><body>'+
-    '<div class="c b" style="font-size:14px">'+loja+'</div>'+
-    (cnpj?'<div class="c">CNPJ: '+cnpj+'</div>':'')+
-    '<div class="c">'+dt+'</div>'+
-    '<div class="linha"></div>'+
-    '<div class="b">ITEM&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TOTAL</div>'+
-    '<div class="linha"></div>'+
-    linhas+
-    '<div class="linha"></div>'+
-    '<div style="display:flex;justify-content:space-between"><span>Subtotal:</span><span>R$ '+orig.toFixed(2)+'</span></div>'+
-    (desc>0?'<div style="display:flex;justify-content:space-between"><span>Desconto:</span><span>- R$ '+desc.toFixed(2)+'</span></div>':'')+
-    '<div class="linha"></div>'+
-    '<div style="display:flex;justify-content:space-between" class="b g"><span>TOTAL:</span><span>R$ '+total.toFixed(2)+'</span></div>'+
-    '<div class="linha"></div>'+
-    '<div class="c" style="margin-top:8px;font-size:10px">'+rodape+'</div>'+
-    '<div class="c" style="font-size:10px">ConvênFácil - convenfacil.com.br</div>'+
-    '<br><br>'+
-    '</body></html>'
-
-  imprimirComPreview(html,'Recibo pronto para impressao')
 }
 
 // ============ ATENDIMENTO POR MESAS (modulo, liga/desliga por cliente) ============

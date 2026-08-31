@@ -200,10 +200,12 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg0);color:
 /* NF MODAL */
 .nf-modal{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
 .nf-modal.open{display:flex}
-.nf-box{background:var(--bg1);border:1px solid var(--border2);border-radius:var(--rad2);padding:28px;width:420px;text-align:center;box-shadow:var(--shadow2);cursor:default}
+.nf-box{background:var(--bg1);border:1px solid var(--border2);border-radius:var(--rad2);padding:28px;width:420px;max-width:calc(100vw - 24px);text-align:center;box-shadow:var(--shadow2);cursor:default}
 .nf-box h3{font-size:16px;font-weight:700;margin-bottom:8px}
 .nf-box p{font-size:13px;color:var(--txt2);margin-bottom:20px}
 .nf-btns{display:flex;gap:10px;justify-content:center}
+.nf-actions{flex-direction:column}
+.nf-actions .btn{width:100%;justify-content:center;min-height:42px}
 .nf-input{padding:10px 12px;border-radius:var(--rad);border:1px solid var(--border);background:var(--bg2);font-size:14px;color:var(--txt1);outline:none;width:100%;font-family:inherit;margin-bottom:12px;display:none;text-align:center;letter-spacing:2px}
 .nf-input:focus{border-color:var(--acc)}
 
@@ -261,6 +263,17 @@ tr:hover td{background:var(--bg2)}
 .lrow{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;color:var(--txt2)}
 .lrow:last-child{border-bottom:none}
 .lrow strong{color:var(--txt1)}
+.receipt-history-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
+.receipt-history-row:last-child{border-bottom:none}
+.receipt-history-info{display:flex;flex-direction:column;min-width:0;color:var(--txt2)}
+.receipt-history-info span{font-size:12px}
+.receipt-history-info small{color:var(--txt3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.receipt-history-row>strong{color:var(--green);white-space:nowrap}
+.receipt-reprint{padding:6px 10px;font-size:12px;white-space:nowrap}
+@media(max-width:600px){
+  .receipt-history-row{grid-template-columns:minmax(0,1fr) auto}
+  .receipt-reprint{grid-column:1/-1;width:100%;justify-content:center}
+}
 
 /* ALERT */
 .alert-bar{background:rgba(245,200,66,.08);border:1px solid rgba(245,200,66,.2);border-radius:var(--rad);padding:10px 14px;display:none;align-items:center;gap:9px;margin-bottom:14px;font-size:13px;color:var(--yellow)}
