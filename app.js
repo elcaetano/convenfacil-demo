@@ -56,21 +56,33 @@ function imprimirViaIframe(html){
 function imprimirComPreview(html,tituloBarra){
   // Chrome da janela de preview no mesmo padrao visual do resto do app (cores, fonte, botoes) —
   // so o CONTEUDO do papel/cupom continua branco/preto de proposito, pra imprimir igual numa impressora de verdade.
-  var toolbar='<div class="no-print" style="position:fixed;top:0;left:0;right:0;background:#13161e;padding:12px 18px;display:flex;align-items:center;justify-content:space-between;z-index:999;border-bottom:1px solid #2e3548;font-family:system-ui,-apple-system,sans-serif;box-shadow:0 4px 24px rgba(0,0,0,.4)">'+
-    '<span style="color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px">&#x1F5A8; '+(tituloBarra||'Pronto para impressao')+'</span>'+
-    '<div style="display:flex;gap:10px">'+
-      '<button onclick="window.close()" style="padding:9px 18px;background:#222736;color:#fff;border:1px solid #3a4260;border-radius:10px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit">Fechar</button>'+
-      '<button onclick="window.print()" style="padding:9px 22px;background:#3ecf8e;color:#0d0f14;border:1px solid #3ecf8e;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">&#x2705; Imprimir agora</button>'+
+  var toolbar='<div class="no-print preview-toolbar">'+
+    '<div class="preview-heading"><span class="preview-icon">&#x1F5A8;</span><div><strong>'+(tituloBarra||'Pronto para imprimir')+'</strong><small>Confira os dados antes de continuar</small></div></div>'+
+    '<div class="preview-actions">'+
+      '<button type="button" class="preview-close" onclick="window.close()">Fechar</button>'+
+      '<button type="button" class="preview-print" onclick="window.print()">Imprimir</button>'+
     '</div>'+
-  '</div><div style="height:54px" class="no-print"></div>'
-  var fundoPreview='<style>@media screen{html{background:#0d0f14}body{box-shadow:0 8px 40px rgba(0,0,0,.55);margin-left:auto;margin-right:auto}}@media print{.no-print{display:none!important}}</style>'
+  '</div><div class="no-print preview-spacer"></div>'
+  var fundoPreview='<style>'+
+    '@media screen{'+
+      'html{background:#0d0f14;padding:0 14px 28px}'+
+      'body{box-shadow:0 12px 48px rgba(0,0,0,.55);margin-left:auto!important;margin-right:auto!important}'+
+      '.preview-toolbar{position:fixed;top:0;left:0;right:0;min-height:64px;background:#13161e;padding:10px 18px;display:flex;align-items:center;justify-content:space-between;gap:14px;z-index:999;border-bottom:1px solid #2e3548;font-family:system-ui,-apple-system,sans-serif;box-shadow:0 4px 24px rgba(0,0,0,.4)}'+
+      '.preview-heading{display:flex;align-items:center;gap:10px;color:#fff;min-width:0}.preview-heading strong{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.preview-heading small{display:block;color:#8991ac;font-size:11px;margin-top:2px}.preview-icon{font-size:20px}'+
+      '.preview-actions{display:flex;gap:8px;flex-shrink:0}.preview-actions button{height:38px;padding:0 16px;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}'+
+      '.preview-close{background:#222736;color:#fff;border:1px solid #3a4260}.preview-print{background:#3ecf8e;color:#0d0f14;border:1px solid #3ecf8e}'+
+      '.preview-spacer{height:76px}'+
+      '@media(max-width:460px){.preview-toolbar{align-items:stretch;flex-direction:column}.preview-actions button{flex:1}.preview-actions{width:100%}.preview-spacer{height:118px}}'+
+    '}'+
+    '@media print{.no-print{display:none!important}}'+
+  '</style>'
   var htmlComToolbar=html
     .replace('<style>',fundoPreview+'<style>')
     .replace(/<body>/,'<body>'+toolbar)
   if(htmlComToolbar.indexOf('onafterprint')===-1){
     htmlComToolbar=htmlComToolbar.replace('</body>','<script>window.onafterprint=function(){window.close()}<\/script></body>')
   }
-  var w=window.open('','_blank','width=420,height=720')
+  var w=window.open('','_blank','width=520,height=820')
   w.document.write(htmlComToolbar)
   w.document.close()
 }
@@ -699,47 +711,113 @@ async function pay(metodo,cpf,imprimirRecibo){
   if(cpf)msg+=' | CPF: '+cpf
   toast(msg)
   cartSnapshot=cart.slice()
-  if(imprimirRecibo&&cpf) imprimirReciboComCPF(cpf,metodo,total)
+  if(imprimirRecibo&&cpf) imprimirReciboComCPF(cpf,metodo,total,venda.id,venda.criado_em)
   cart=[];renderCart();renderPDV();updateBadge()
 }
 
-function imprimirReciboComCPF(cpf,metodo,total){
-  var loja=localStorage.getItem('nome_loja')||'CONVENFACIL'
+function escaparHtmlRecibo(valor){
+  return String(valor==null?'':valor)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#039;')
+}
+
+function moedaRecibo(valor){
+  return Number(valor||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})
+}
+
+function montarHtmlReciboComCPF(cpf,metodo,total,vendaId,criadoEm,itens){
+  var loja=localStorage.getItem('nome_loja')||'CONVENFÁCIL'
   var cnpj=localStorage.getItem('cnpj_loja')||''
-  var rodape=localStorage.getItem('rodape_cupom')||'Obrigado pela preferencia!'
-  var now=new Date()
-  var dt=now.toLocaleDateString('pt-BR')+' '+now.toLocaleTimeString('pt-BR')
-  var itensHTML=cartSnapshot.map(function(c){
-    return'<div>'+c.nome.substring(0,24)+'</div>'+
-      '<div style="display:flex;justify-content:space-between">'+
-        '<span>'+c.qty+'x R$'+Number(c.preco_final).toFixed(2)+'</span>'+
-        '<span>R$'+(Number(c.preco_final)*c.qty).toFixed(2)+'</span>'+
-      '</div>'
+  var telefone=localStorage.getItem('tel_loja')||''
+  var endereco=localStorage.getItem('end_loja')||''
+  var cidade=localStorage.getItem('cidade_loja')||''
+  var rodape=localStorage.getItem('rodape_cupom')||'Obrigado pela preferência!'
+  var dataVenda=criadoEm?new Date(criadoEm):new Date()
+  if(isNaN(dataVenda.getTime()))dataVenda=new Date()
+  var dt=dataVenda.toLocaleDateString('pt-BR')+' às '+dataVenda.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})
+  var numeroRecibo=vendaId?String(vendaId).replace(/-/g,'').slice(0,8).toUpperCase():String(Date.now()).slice(-8)
+  itens=Array.isArray(itens)?itens:[]
+  var subtotal=itens.reduce(function(a,c){return a+Number(c.preco_venda||c.preco_final)*c.qty},0)
+  var desconto=Math.max(0,subtotal-Number(total))
+  var itensHTML=itens.map(function(c){
+    var nome=escaparHtmlRecibo(c.nome)
+    var unitario=Number(c.preco_final)
+    var quantidade=Number(c.qty)
+    return '<tr>'+
+      '<td class="item-desc"><strong>'+nome+'</strong><span>'+quantidade+' × '+moedaRecibo(unitario)+'</span></td>'+
+      '<td class="item-total">'+moedaRecibo(unitario*quantidade)+'</td>'+
+    '</tr>'
   }).join('')
-  var orig=cartSnapshot.reduce(function(a,c){return a+Number(c.preco_venda)*c.qty},0)
-  var html='<!DOCTYPE html><html><head><meta charset="UTF-8">'+
-    '<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:"Courier New",monospace;font-size:11px;width:80mm;background:#fff;color:#000;padding:3mm}.c{text-align:center}.b{font-weight:bold}.g{font-size:14px}.linha{border-top:1px dashed #000;margin:4px 0}@media print{body{width:80mm;-webkit-print-color-adjust:exact}}</style>'+
-    '</head><body>'+
-    '<div class="c b" style="font-size:14px">'+loja+'</div>'+
-    (cnpj?'<div class="c">CNPJ: '+cnpj+'</div>':'')+
-    '<div class="c">'+dt+'</div>'+
-    '<div class="linha"></div>'+
-    '<div class="c b" style="background:#000;color:#fff;padding:3px;margin:4px 0">RECIBO COM CPF</div>'+
-    '<div class="c b" style="font-size:13px;margin:4px 0">CPF: '+cpf+'</div>'+
-    '<div class="linha"></div>'+
-    '<div class="b">ITEM                    TOTAL</div>'+
-    '<div class="linha"></div>'+
-    itensHTML+
-    '<div class="linha"></div>'+
-    '<div style="display:flex;justify-content:space-between"><span>Subtotal:</span><span>R$ '+orig.toFixed(2)+'</span></div>'+
-    '<div class="linha"></div>'+
-    '<div style="display:flex;justify-content:space-between" class="b g"><span>TOTAL:</span><span>R$ '+total.toFixed(2)+'</span></div>'+
-    '<div style="display:flex;justify-content:space-between"><span>Pagamento:</span><span>'+metodo+'</span></div>'+
-    '<div class="linha"></div>'+
-    '<div class="c" style="font-size:10px;margin-top:6px">'+rodape+'</div>'+
-    '<div class="c" style="font-size:10px">ConvenFacil - convenfacil.com.br</div>'+
-    '<br><br></body></html>'
-  imprimirComPreview(html,'Recibo pronto para impressao')
+  var localizacao=[endereco,cidade].filter(Boolean).map(escaparHtmlRecibo).join(' • ')
+  return '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'+
+    '<meta name="viewport" content="width=device-width,initial-scale=1">'+
+    '<title>Recibo '+numeroRecibo+'</title>'+
+    '<style>'+
+      '@page{size:80mm auto;margin:0}'+
+      '*{box-sizing:border-box}'+
+      'html,body{margin:0;padding:0;background:#fff;color:#111}'+
+      'body{width:80mm;min-height:100%;padding:5mm 4mm 7mm;font-family:Arial,Helvetica,sans-serif;font-size:10.5px;line-height:1.35}'+
+      '.center{text-align:center}.muted{color:#444}.strong{font-weight:700}'+
+      '.brand{font-size:18px;font-weight:800;line-height:1.1;letter-spacing:.3px;text-transform:uppercase;margin-bottom:3px}'+
+      '.store-meta{font-size:9.5px;line-height:1.45}'+
+      '.divider{border:0;border-top:1px dashed #555;margin:10px 0}'+
+      '.doc-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}'+
+      '.doc-title{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.6px}'+
+      '.doc-number{text-align:right;font-size:9px;white-space:nowrap}'+
+      '.customer{border:1px solid #222;border-radius:4px;padding:7px 8px;margin:9px 0}'+
+      '.customer-label{display:block;font-size:8px;text-transform:uppercase;letter-spacing:.7px;margin-bottom:2px;color:#444}'+
+      '.customer-value{font-size:13px;font-weight:800;letter-spacing:.4px}'+
+      'table{width:100%;border-collapse:collapse;table-layout:fixed}'+
+      'thead th{font-size:8px;text-transform:uppercase;letter-spacing:.5px;text-align:left;border-bottom:1px solid #222;padding:0 0 5px}'+
+      'thead th:last-child{text-align:right;width:27mm}'+
+      'tbody td{padding:7px 0;border-bottom:1px dotted #aaa;vertical-align:top}'+
+      '.item-desc{padding-right:8px;overflow-wrap:anywhere}.item-desc strong{display:block;font-size:10.5px}.item-desc span{display:block;color:#444;font-size:9px;margin-top:2px}'+
+      '.item-total{text-align:right;font-weight:700;white-space:nowrap}'+
+      '.summary{margin-top:8px}.summary-row{display:flex;justify-content:space-between;gap:10px;padding:2px 0}'+
+      '.discount{font-weight:700}'+
+      '.grand-total{border:2px solid #111;border-radius:4px;margin:7px 0;padding:7px 8px;font-size:16px;font-weight:900;display:flex;justify-content:space-between}'+
+      '.payment{display:flex;justify-content:space-between;font-weight:700;padding:2px 0}'+
+      '.footer{margin-top:12px;text-align:center;font-size:9px;line-height:1.45}'+
+      '.fiscal-note{font-weight:800;text-transform:uppercase;margin-bottom:7px}'+
+      '.signature{margin-top:18px;border-top:1px solid #555;padding-top:4px}'+
+      '@media print{html,body{width:80mm;-webkit-print-color-adjust:exact;print-color-adjust:exact}}'+
+    '</style></head><body>'+
+      '<header class="center">'+
+        '<div class="brand">'+escaparHtmlRecibo(loja)+'</div>'+
+        '<div class="store-meta">'+
+          (cnpj?'<div>CNPJ: '+escaparHtmlRecibo(cnpj)+'</div>':'')+
+          (localizacao?'<div>'+localizacao+'</div>':'')+
+          (telefone?'<div>Telefone: '+escaparHtmlRecibo(telefone)+'</div>':'')+
+        '</div>'+
+      '</header>'+
+      '<hr class="divider">'+
+      '<section class="doc-head">'+
+        '<div><div class="doc-title">Recibo de venda</div><div class="muted">'+dt+'</div></div>'+
+        '<div class="doc-number"><span class="muted">Nº do recibo</span><br><strong>'+numeroRecibo+'</strong></div>'+
+      '</section>'+
+      '<section class="customer"><span class="customer-label">CPF do consumidor</span><span class="customer-value">'+escaparHtmlRecibo(cpf)+'</span></section>'+
+      '<table><thead><tr><th>Descrição</th><th>Valor</th></tr></thead><tbody>'+itensHTML+'</tbody></table>'+
+      '<section class="summary">'+
+        '<div class="summary-row"><span>Subtotal</span><strong>'+moedaRecibo(subtotal)+'</strong></div>'+
+        (desconto>0.009?'<div class="summary-row discount"><span>Desconto</span><span>- '+moedaRecibo(desconto)+'</span></div>':'')+
+        '<div class="grand-total"><span>Total</span><span>'+moedaRecibo(total)+'</span></div>'+
+        '<div class="payment"><span>Pagamento</span><span>'+escaparHtmlRecibo(metodo)+'</span></div>'+
+      '</section>'+
+      '<hr class="divider">'+
+      '<footer class="footer">'+
+        '<div class="fiscal-note">Documento sem valor fiscal</div>'+
+        '<div>'+escaparHtmlRecibo(rodape)+'</div>'+
+        '<div class="signature">ConvenFácil • convenfacil.com.br</div>'+
+      '</footer>'+
+    '</body></html>'
+}
+
+function imprimirReciboComCPF(cpf,metodo,total,vendaId,criadoEm){
+  var html=montarHtmlReciboComCPF(cpf,metodo,total,vendaId,criadoEm,cartSnapshot)
+  imprimirComPreview(html,'Recibo pronto para imprimir')
 }
 
 function clearCart(){
