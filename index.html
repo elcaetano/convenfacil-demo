@@ -7,7 +7,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Oswald:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="./styles.css?v=20260831-20">
+<link rel="stylesheet" href="./styles.css?v=20260901-1">
 </head>
 <body>
 
@@ -23,8 +23,9 @@
     <form id="login-form" onsubmit="doLogin(event)" novalidate>
       <div class="login-err" id="login-err" role="alert" aria-live="polite"></div>
       <div class="fg"><label for="login-email">E-mail</label><input type="email" id="login-email" placeholder="seu@email.com" autocomplete="username" inputmode="email" required></div>
-      <div class="fg"><label for="login-senha">Senha</label><input type="password" id="login-senha" placeholder="••••••••" autocomplete="current-password" required></div>
+      <div class="fg"><label for="login-senha">Senha</label><div class="password-wrap"><input type="password" id="login-senha" placeholder="••••••••" autocomplete="current-password" required><button type="button" class="password-toggle" onclick="alternarSenha('login-senha',this)" aria-label="Mostrar senha" title="Mostrar senha">&#x1F441;</button></div></div>
       <button class="btn-login" type="submit" id="btn-login-do">Entrar no sistema</button>
+      <button class="login-link" type="button" onclick="solicitarRecuperacaoSenha()">Esqueci minha senha</button>
     </form>
     <div class="login-footer">ConvenFácil &copy; 2026. Desenvolvido por <a href="https://ninjai.com.br" target="_blank" rel="noopener noreferrer"><img src="https://www.ninjai.com.br/ninjai-logo.png" alt="NinjAI" style="height:16px;vertical-align:middle;opacity:.7;transition:.2s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.7"></a></div>
   </div>
@@ -329,6 +330,7 @@
           <select id="rel-tipo" onchange="renderRelatorio()">
             <option value="vendas">Vendas por periodo</option>
             <option value="vendas_forma">Vendas por forma de pagamento</option>
+            <option value="cartoes">Conciliação de cartões</option>
             <option value="fechamento_caixa">Fechamento de caixa</option>
             <option value="sangrias">Sangrias e suprimentos</option>
             <option value="mesas">Mesas atendidas</option>
@@ -414,6 +416,11 @@
             <button class="btn acc" style="width:100%;justify-content:center;margin-top:8px" onclick="salvarConfigImpressao()">&#x2713; Salvar configuracao de impressao</button>
 
           </div>
+        </div>
+        <div class="lcard" id="cfg-dados" style="margin-top:16px;display:none">
+          <h3 style="margin-bottom:8px">&#x1F512; Dados e segurança</h3>
+          <p style="font-size:12px;color:var(--txt2);line-height:1.55;margin-bottom:14px">Baixe uma cópia dos dados da sua loja para conferência. O arquivo não inclui senhas.</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" type="button" onclick="exportarResumoVendasCsv()">&#x1F4CA; Exportar vendas em CSV</button><button class="btn acc" type="button" onclick="exportarDadosLojaJson()">&#x1F4E5; Baixar cópia completa</button></div>
         </div>
         <!-- STATUS DAS CONFIGS -->
         <div class="lcard" style="margin-top:16px">
@@ -1071,8 +1078,19 @@
   </div>
 </div>
 
+<!-- RECUPERAÇÃO DE SENHA -->
+<div class="ov" id="ov-redefinir-senha">
+  <div class="modal" style="max-width:390px">
+    <h2>&#x1F511; Criar nova senha</h2>
+    <p class="modal-intro">Escolha uma senha nova com pelo menos 8 caracteres.</p>
+    <div class="fg"><label for="nova-senha">Nova senha</label><div class="password-wrap"><input type="password" id="nova-senha" autocomplete="new-password"><button type="button" class="password-toggle" onclick="alternarSenha('nova-senha',this)" aria-label="Mostrar senha">&#x1F441;</button></div></div>
+    <div class="fg"><label for="confirmar-nova-senha">Confirmar nova senha</label><div class="password-wrap"><input type="password" id="confirmar-nova-senha" autocomplete="new-password"><button type="button" class="password-toggle" onclick="alternarSenha('confirmar-nova-senha',this)" aria-label="Mostrar senha">&#x1F441;</button></div></div>
+    <div class="modal-ft"><button class="btn" type="button" onclick="closeModals();doLogout()">Cancelar</button><button class="btn acc" type="button" onclick="confirmarNovaSenha()">Salvar nova senha</button></div>
+  </div>
+</div>
+
 <div class="toast ok" id="tst"><span class="tic" id="tic">&#x2713;</span><span id="tst-m">ok</span></div>
 
-<script src="./app.js?v=20260831-22"></script>
+<script src="./app.js?v=20260901-1"></script>
 </body>
 </html>

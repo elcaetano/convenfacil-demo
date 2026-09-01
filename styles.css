@@ -31,6 +31,12 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg0);color:
 .fg select option{background:var(--bg2)}
 .btn-login{width:100%;padding:12px;border-radius:var(--rad);border:none;background:linear-gradient(135deg,var(--acc),var(--purple));cursor:pointer;font-size:14px;font-weight:600;color:#fff;font-family:inherit;margin-top:4px;transition:.15s}
 .btn-login:hover{opacity:.9}
+.login-link{display:block;margin:14px auto 0;background:transparent;border:0;color:var(--acc);font-size:12px;cursor:pointer;font-family:inherit}
+.login-link:hover{text-decoration:underline}
+.password-wrap{position:relative}
+.password-wrap input{padding-right:42px!important}
+.password-toggle{position:absolute;right:5px;top:50%;transform:translateY(-50%);width:32px;height:30px;border:0;border-radius:7px;background:transparent;color:var(--txt2);cursor:pointer;font-size:14px}
+.password-toggle:hover{background:var(--bg3);color:var(--txt1)}
 .login-footer{text-align:center;margin-top:20px;font-size:11px;color:var(--txt3)}
 
 /* APP */

@@ -13,6 +13,7 @@ let excecoes=[]
 const INACTIVITY_LIMIT_MS=30*60*1000
 let inactivityTimer=null
 let logoutEmAndamento=false
+let recuperacaoSenhaAtiva=false
 
 // Multi-tenant: cliente_id do usuario logado, pra nunca uma loja ver dado de outra loja.
 // Master (superadmin) nao tem cliente_id — visao dele fica sem filtro de proposito, pra
@@ -200,6 +201,50 @@ async function carregarPerfilLogado(authUser){
   return data
 }
 
+function alternarSenha(id,botao){
+  var campo=document.getElementById(id)
+  if(!campo)return
+  var mostrar=campo.type==='password'
+  campo.type=mostrar?'text':'password'
+  if(botao){botao.setAttribute('aria-label',mostrar?'Ocultar senha':'Mostrar senha');botao.title=mostrar?'Ocultar senha':'Mostrar senha';botao.innerHTML=mostrar?'&#x1F648;':'&#x1F441;'}
+}
+
+async function solicitarRecuperacaoSenha(){
+  var email=document.getElementById('login-email').value.trim()
+  var err=document.getElementById('login-err')
+  if(!email){err.textContent='Informe seu e-mail para recuperar a senha';err.style.display='block';document.getElementById('login-email').focus();return}
+  try{
+    var retorno=await db.auth.resetPasswordForEmail(email,{redirectTo:window.location.origin+'/?redefinir-senha=1'})
+    if(retorno.error)throw retorno.error
+    err.textContent='Se este e-mail estiver cadastrado, você receberá um link para criar uma nova senha.'
+    err.style.display='block'
+  }catch(e){
+    err.textContent='Não foi possível solicitar a recuperação agora. Tente novamente mais tarde.'
+    err.style.display='block'
+  }
+}
+
+async function confirmarNovaSenha(){
+  var senha=document.getElementById('nova-senha').value
+  var confirmar=document.getElementById('confirmar-nova-senha').value
+  if(senha.length<8){toast('A senha precisa ter pelo menos 8 caracteres',1);return}
+  if(senha!==confirmar){toast('As senhas não conferem',1);return}
+  var res=await db.auth.updateUser({password:senha})
+  if(res.error){toast('Não foi possível alterar a senha. Solicite um novo link.',1);return}
+  recuperacaoSenhaAtiva=false
+  closeModals()
+  await doLogout('Senha alterada. Entre novamente com sua nova senha.')
+}
+
+db.auth.onAuthStateChange(function(evento){
+  if(evento==='PASSWORD_RECOVERY'){
+    recuperacaoSenhaAtiva=true
+    document.getElementById('login-wrap').style.display='flex'
+    document.getElementById('app').classList.remove('on')
+    document.getElementById('ov-redefinir-senha').classList.add('open')
+  }
+})
+
 async function doLogin(event){
   if(event)event.preventDefault()
   const email=document.getElementById('login-email').value.trim()
@@ -210,11 +255,11 @@ async function doLogin(event){
   btn.textContent='Entrando...';btn.disabled=true;err.style.display='none'
   try{
     const{data:authData,error:authErr}=await db.auth.signInWithPassword({email:email,password:senha})
-    if(authErr||!authData.user){err.textContent='Email ou senha incorretos';err.style.display='block';btn.textContent='Entrar no sistema';btn.disabled=false;return}
+    if(authErr||!authData.user){err.textContent='Não foi possível entrar. Confira suas credenciais.';err.style.display='block';btn.textContent='Entrar no sistema';btn.disabled=false;return}
     const perfil=await carregarPerfilLogado(authData.user)
     if(!perfil){
       await db.auth.signOut()
-      err.textContent='Usuario inativo ou nao encontrado';err.style.display='block';btn.textContent='Entrar no sistema';btn.disabled=false;return
+      err.textContent='Não foi possível entrar. Fale com o responsável pela loja.';err.style.display='block';btn.textContent='Entrar no sistema';btn.disabled=false;return
     }
     // So guarda o EMAIL pra facilitar o proximo login (autopreenche o campo).
     // A senha nunca fica guardada em lugar nenhum do app.
@@ -305,7 +350,9 @@ async function ajustarMenuPorFuncionalidades(){
 function ajustarMenuPorNivel(){
   var nivel=userLogado.nivel
   var cfgAdminClientes=document.getElementById('cfg-admin-clientes')
+  var cfgDados=document.getElementById('cfg-dados')
   if(cfgAdminClientes)cfgAdminClientes.style.display=nivel==='superadmin'?'flex':'none'
+  if(cfgDados)cfgDados.style.display=nivel==='admin'?'block':'none'
   ;['grp-vendas','grp-estoque','grp-fin','grp-gestao'].forEach(function(id){
     var grupo=document.getElementById(id);if(grupo)grupo.style.display=''
   })
@@ -1946,6 +1993,20 @@ async function renderRelatorio(){
         return'<tr><td>'+f+'</td><td>'+g.qtd+'</td><td style="color:var(--green);font-weight:600">R$ '+g.total.toFixed(2)+'</td><td>'+pct+'%</td></tr>'
       }).join(''):'<tr><td colspan="4"><div class="empty">Nenhuma venda no periodo</div></td></tr>')+
       '</tbody></table></div>'
+  } else if(tipo==='cartoes'){
+    var res=await scopeCid(db.from('vendas').select('*')).gte('criado_em',dataInicio).order('criado_em',{ascending:false})
+    var vendas=res.data||[]
+    var cartoes=vendas.filter(function(v){return /cartao|cr[eé]dito|d[eé]bito/i.test(String(v.forma_pagamento||''))})
+    var porTipo={}
+    cartoes.forEach(function(v){
+      var tipoCartao=/cr[eé]dito/i.test(String(v.forma_pagamento||''))?'Crédito':'Débito'
+      if(!porTipo[tipoCartao])porTipo[tipoCartao]={qtd:0,total:0}
+      porTipo[tipoCartao].qtd++;porTipo[tipoCartao].total+=Number(v.total||0)
+    })
+    var totalCartoes=cartoes.reduce(function(s,v){return s+Number(v.total||0)},0)
+    el.innerHTML='<div class="mc b" style="margin-bottom:16px"><div class="lbl">Valor esperado nas maquininhas</div><div class="val">R$ '+totalCartoes.toFixed(2)+'</div><div class="sub">'+cartoes.length+' vendas em cartão. Compare este valor com o relatório da operadora.</div></div>'+
+      '<div class="lcard" style="margin-bottom:16px;font-size:12px;color:var(--txt2);line-height:1.55"><strong style="color:var(--txt1)">Como conferir:</strong> feche o período na operadora, desconte as taxas informadas por ela e compare o líquido recebido com este relatório. A integração automática com a maquininha depende da adquirente escolhida.</div>'+
+      '<div class="tbl"><table><thead><tr><th>Tipo</th><th>Vendas</th><th>Valor bruto</th></tr></thead><tbody>'+Object.keys(porTipo).map(function(tipoCartao){var item=porTipo[tipoCartao];return'<tr><td>'+tipoCartao+'</td><td>'+item.qtd+'</td><td style="color:var(--green);font-weight:600">R$ '+item.total.toFixed(2)+'</td></tr>'}).join('')+(cartoes.length?'':'<tr><td colspan="3"><div class="empty">Nenhuma venda em cartão no período</div></td></tr>')+'</tbody></table></div>'
   } else if(tipo==='abc'){
     var resV=await scopeCid(db.from('vendas').select('id')).gte('criado_em',dataInicio)
     var vendaIds=(resV.data||[]).map(function(v){return v.id})
@@ -2132,7 +2193,7 @@ function printRel(){
   if(!el || !el.innerHTML.trim()){ toast('Carregue um relatorio primeiro', 1); return }
   var loja = localStorage.getItem('nome_loja') || 'ConvenFacil'
   var now = new Date().toLocaleString('pt-BR')
-  var titulos = {vendas:'Relatorio de Vendas', vendas_forma:'Vendas por Forma de Pagamento', fechamento_caixa:'Fechamento de Caixa', sangrias:'Sangrias e Suprimentos', mesas:'Relatorio de Mesas Atendidas', comissoes_garcom:'Relatorio de Comissoes de Garcons', pix:'Relatorio PIX', abc:'Curva ABC de Produtos', giro:'Giro de Estoque', horario:'Mais Vendidos por Horario', pagar:'Relatorio Contas a Pagar', excecoes:'Relatorio de Excecoes'}
+  var titulos = {vendas:'Relatorio de Vendas', vendas_forma:'Vendas por Forma de Pagamento', cartoes:'Conciliação de Cartões', fechamento_caixa:'Fechamento de Caixa', sangrias:'Sangrias e Suprimentos', mesas:'Relatorio de Mesas Atendidas', comissoes_garcom:'Relatorio de Comissoes de Garcons', pix:'Relatorio PIX', abc:'Curva ABC de Produtos', giro:'Giro de Estoque', horario:'Mais Vendidos por Horario', pagar:'Relatorio Contas a Pagar', excecoes:'Relatorio de Excecoes'}
   var html = '<!DOCTYPE html><html><head><meta charset="UTF-8">'+
     '<style>'+
     ':root{--green:#087f5b;--red:#c92a2a;--yellow:#8a5b00;--txt1:#111;--txt2:#333;--txt3:#666}'+
@@ -2463,12 +2524,14 @@ async function renderSuperAdmin(){
   if(!userLogado||userLogado.nivel!=='superadmin')return
   var resultados=await Promise.all([
     db.from('clientes').select('*').order('nome'),
-    db.from('cobrancas_clientes').select('*').order('vencimento',{ascending:false})
+    db.from('cobrancas_clientes').select('*').order('vencimento',{ascending:false}),
+    db.from('usuarios').select('id,nivel,cliente_id,ativo')
   ])
   if(resultados[0].error){toast('Não foi possível carregar os clientes',1);return}
   if(resultados[1].error){toast('Não foi possível carregar as mensalidades',1);return}
   clientesMaster=resultados[0].data||[]
   cobrancasMaster=resultados[1].data||[]
+  var usuariosMaster=resultados[2].data||[]
   var lista=clientesMaster
   var mesAtual=dataLocalInput(new Date()).slice(0,7)
   var ativos=lista.filter(function(c){return c.ativo})
@@ -2494,6 +2557,7 @@ async function renderSuperAdmin(){
     var ultimaData=c.ultimo_pagamento_em?formatarDataCobranca(c.ultimo_pagamento_em):'Nenhum'
     var vencimento=cobranca&&cobranca.status==='pendente'?cobranca.vencimento:c.proximo_vencimento
     var pc=c.plano==='premium'?'var(--purple)':c.plano==='profissional'?'var(--acc)':'var(--txt2)'
+    var donoAtivo=usuariosMaster.some(function(u){return u.cliente_id===c.id&&u.nivel==='admin'&&u.ativo})
     return'<div class="cliente-card">'+
       '<div class="cliente-header">'+
         '<div class="cliente-info">'+
@@ -2503,6 +2567,7 @@ async function renderSuperAdmin(){
         '<div class="cliente-actions">'+
           '<span class="tag '+(c.ativo?'ok':'out')+'">'+(c.ativo?'Ativo':'Inativo')+'</span>'+
           '<span class="tag '+statusClasse+'">'+statusTexto+'</span>'+
+          '<span class="tag '+(donoAtivo?'ok':'low')+'">'+(donoAtivo?'Acesso do dono pronto':'Falta criar acesso')+'</span>'+
           '<button class="btn sm" onclick="abrirCriarDono(\''+c.id+'\')" title="Criar login de administrador para o dono">&#x1F511; Acesso do dono</button>'+
           '<button class="btn sm '+(c.ativo?'red':'grn')+'" onclick="toggleCliente(\''+c.id+'\','+c.ativo+')">'+(c.ativo?'Suspender':'Ativar')+'</button>'+
         '</div>'+
@@ -2572,9 +2637,17 @@ async function registrarPagamentoCliente(){
   var pagoEm=new Date(data+'T12:00:00').toISOString()
   var atualizacao=await db.from('cobrancas_clientes').update({status:'pago',valor_pago:valor,pago_em:pagoEm,forma_pagamento:forma,observacao:obs||null,atualizado_em:new Date().toISOString()}).eq('id',cobrancaId).eq('status','pendente').select().single()
   if(atualizacao.error){toast('Não foi possível registrar o pagamento',1);return}
-  await db.from('clientes').update({ultimo_pagamento_em:pagoEm,proximo_vencimento:somarMesData(vencimento)}).eq('id',clienteId)
+  var proximoVencimento=somarMesData(vencimento)
+  await db.from('clientes').update({ultimo_pagamento_em:pagoEm,proximo_vencimento:proximoVencimento}).eq('id',clienteId)
+  // Mantem sempre a próxima mensalidade preparada. A cobrança é criada depois da baixa da
+  // anterior, sem depender de o Master lembrar de gerar uma nova todo mês.
+  var competenciaSeguinte=String(proximoVencimento).slice(0,7)+'-01'
+  var proximaExistente=await db.from('cobrancas_clientes').select('id').eq('cliente_id',clienteId).eq('competencia',competenciaSeguinte).maybeSingle()
+  if(!proximaExistente.data){
+    await db.from('cobrancas_clientes').insert({cliente_id:clienteId,competencia:competenciaSeguinte,vencimento:proximoVencimento,valor:Number(atualizacao.data&&atualizacao.data.valor||valor)})
+  }
   closeModals()
-  toast('Pagamento registrado com sucesso')
+  toast('Pagamento registrado. Próxima mensalidade preparada.')
   renderSuperAdmin()
 }
 
@@ -3055,6 +3128,50 @@ function salvarConfigPix(){
 function salvarConfigImpressao(){
   localStorage.setItem('rodape_cupom',document.getElementById('cfg-rodape').value)
   toast('Configuracao de impressao salva!')
+}
+
+function baixarArquivo(nome,conteudo,tipo){
+  var blob=new Blob([conteudo],{type:tipo||'application/octet-stream'})
+  var url=URL.createObjectURL(blob)
+  var link=document.createElement('a')
+  link.href=url;link.download=nome;document.body.appendChild(link);link.click();link.remove()
+  setTimeout(function(){URL.revokeObjectURL(url)},1000)
+}
+
+function escaparCsv(valor){
+  var texto=valor==null?'':String(valor)
+  return '"'+texto.replace(/"/g,'""')+'"'
+}
+
+async function exportarResumoVendasCsv(){
+  if(!userLogado||userLogado.nivel!=='admin'){toast('Apenas o administrador da loja pode exportar dados',1);return}
+  var res=await scopeCid(db.from('vendas').select('*')).order('criado_em',{ascending:false})
+  if(res.error){toast('Não foi possível exportar as vendas',1);return}
+  var linhas=[['Data e hora','Forma de pagamento','Operador','Total','Recibo']]
+  ;(res.data||[]).forEach(function(v){linhas.push([new Date(v.criado_em).toLocaleString('pt-BR'),v.forma_pagamento||'',v.usuario_nome||'',Number(v.total||0).toFixed(2),v.id||''])})
+  var csv='\ufeff'+linhas.map(function(l){return l.map(escaparCsv).join(';')}).join('\n')
+  baixarArquivo('convenfacil-vendas-'+dataLocalInput(new Date())+'.csv',csv,'text/csv;charset=utf-8')
+  registrarExcecao('EXPORTAÇÃO DE VENDAS','Arquivo CSV de vendas baixado')
+  toast('Arquivo de vendas baixado')
+}
+
+async function exportarDadosLojaJson(){
+  if(!userLogado||userLogado.nivel!=='admin'){toast('Apenas o administrador da loja pode exportar dados',1);return}
+  var tabelas=['produtos','categorias','vendas','itens_venda','turnos_caixa','movimentos_caixa','clientes_fiado','contas_pagar','contas_receber','promocoes','mesas','comandas','itens_comanda','comissoes_garcom']
+  toast('Preparando cópia dos dados...')
+  var resultados=await Promise.all(tabelas.map(async function(tabela){
+    var res=await scopeCid(db.from(tabela).select('*')).order('criado_em',{ascending:false})
+    return{tabela:tabela,dados:res.error?[]:(res.data||[])}
+  }))
+  var copia={
+    sistema:'ConvenFácil',
+    gerado_em:new Date().toISOString(),
+    estabelecimento:{nome:localStorage.getItem('nome_loja')||'',cnpj:localStorage.getItem('cnpj_loja')||'',cliente_id:meuCid()},
+    dados:{}}
+  resultados.forEach(function(item){copia.dados[item.tabela]=item.dados})
+  baixarArquivo('convenfacil-copia-completa-'+dataLocalInput(new Date())+'.json',JSON.stringify(copia,null,2),'application/json')
+  registrarExcecao('EXPORTAÇÃO COMPLETA','Cópia dos dados da loja baixada')
+  toast('Cópia completa baixada')
 }
 
 // ABAS DO MODAL PROMO
