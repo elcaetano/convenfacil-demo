@@ -304,6 +304,8 @@ async function ajustarMenuPorFuncionalidades(){
 
 function ajustarMenuPorNivel(){
   var nivel=userLogado.nivel
+  var cfgAdminClientes=document.getElementById('cfg-admin-clientes')
+  if(cfgAdminClientes)cfgAdminClientes.style.display=nivel==='superadmin'?'flex':'none'
   ;['grp-vendas','grp-estoque','grp-fin','grp-gestao'].forEach(function(id){
     var grupo=document.getElementById(id);if(grupo)grupo.style.display=''
   })
@@ -446,6 +448,10 @@ function toggleSidebar(){
 }
 
 async function go(id,el){
+  if(id==='superadmin'&&(!userLogado||userLogado.nivel!=='superadmin')){
+    toast('Acesso exclusivo da administração geral',1)
+    return false
+  }
   if(userLogado&&!nivelPodeAcessarTela(id)&&id!=='superadmin'){
     toast('Seu perfil não tem acesso a esta tela',1)
     return false
@@ -2375,27 +2381,139 @@ function toggleExcecaoItens(i){
 }
 
 // SUPER ADMIN
+var clientesMaster=[]
+var cobrancasMaster=[]
+
+function dataLocalInput(data){
+  var d=data||new Date()
+  var mes=String(d.getMonth()+1).padStart(2,'0')
+  var dia=String(d.getDate()).padStart(2,'0')
+  return d.getFullYear()+'-'+mes+'-'+dia
+}
+
+function proximoVencimentoPorDia(dia,mesesAdiante){
+  var d=new Date()
+  d.setDate(1)
+  d.setMonth(d.getMonth()+(mesesAdiante==null?1:mesesAdiante))
+  d.setDate(Math.max(1,Math.min(28,Number(dia)||10)))
+  return dataLocalInput(d)
+}
+
+function proximoVencimentoDisponivel(dia){
+  var hoje=new Date()
+  var mesAdiante=hoje.getDate()>Math.max(1,Math.min(28,Number(dia)||10))?1:0
+  return proximoVencimentoPorDia(dia,mesAdiante)
+}
+
+function somarMesData(data){
+  var partes=String(data||'').split('-').map(Number)
+  if(partes.length!==3)return proximoVencimentoPorDia(10,1)
+  var d=new Date(partes[0],partes[1]-1,1)
+  d.setMonth(d.getMonth()+1)
+  d.setDate(Math.max(1,Math.min(28,partes[2]||10)))
+  return dataLocalInput(d)
+}
+
+function formatarDataCobranca(data){
+  if(!data)return 'Não definido'
+  var p=String(data).slice(0,10).split('-')
+  return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:'Não definido'
+}
+
+function moedaPainel(valor){
+  return Number(valor||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})
+}
+
+function cobrancaEstaAtrasada(cobranca){
+  return cobranca&&cobranca.status==='pendente'&&String(cobranca.vencimento).slice(0,10)<dataLocalInput(new Date())
+}
+
+function ultimaCobrancaDoCliente(clienteId){
+  return cobrancasMaster.find(function(c){return c.cliente_id===clienteId&&c.status!=='cancelado'})||null
+}
+
+function pagamentoClienteNoMes(clienteId,mesAtual){
+  return cobrancasMaster.some(function(c){return c.cliente_id===clienteId&&c.status==='pago'&&String(c.pago_em||'').slice(0,7)===mesAtual})
+}
+
+function abrirNovoClienteSaas(){
+  if(!userLogado||userLogado.nivel!=='superadmin'){toast('Acesso exclusivo da administração geral',1);return}
+  closeModals()
+  ;['nc-nome','nc-email','nc-tel'].forEach(function(id){document.getElementById(id).value=''})
+  document.getElementById('nc-tipo').value='conveniencia'
+  document.getElementById('nc-plano').value='profissional'
+  document.getElementById('nc-valor').value='149.00'
+  document.getElementById('nc-dia').value='10'
+  document.getElementById('nc-venc').value=proximoVencimentoPorDia(10,1)
+  document.getElementById('ov-sa-cliente').classList.add('open')
+  setTimeout(function(){document.getElementById('nc-nome').focus()},50)
+}
+
+function sugerirValorPlano(plano){
+  var valores={basico:99,profissional:149,premium:249}
+  document.getElementById('nc-valor').value=Number(valores[plano]||149).toFixed(2)
+}
+
+function atualizarPrimeiroVencimento(){
+  var dia=Number(document.getElementById('nc-dia').value)||10
+  document.getElementById('nc-venc').value=proximoVencimentoPorDia(dia,1)
+}
+
 async function renderSuperAdmin(){
-  var res=await db.from('clientes').select('*').order('nome')
-  var lista=res.data||[]
-  document.getElementById('sa-tc').textContent=lista.filter(function(c){return c.ativo}).length
-  document.getElementById('sa-tp').textContent=lista.filter(function(c){return c.plano!=='basico'&&c.ativo}).length
-  document.getElementById('sa-rec').textContent='R$ '+(lista.filter(function(c){return c.ativo}).length*149).toLocaleString('pt-BR')
-  if(!lista.length){document.getElementById('clientes-list').innerHTML='<div class="empty">Nenhum cliente</div>';return}
-  var funcs=await Promise.all(lista.map(function(c){return db.from('funcionalidades').select('*').eq('cliente_id',c.id).single()}))
+  if(!userLogado||userLogado.nivel!=='superadmin')return
+  var resultados=await Promise.all([
+    db.from('clientes').select('*').order('nome'),
+    db.from('cobrancas_clientes').select('*').order('vencimento',{ascending:false})
+  ])
+  if(resultados[0].error){toast('Não foi possível carregar os clientes',1);return}
+  if(resultados[1].error){toast('Não foi possível carregar as mensalidades',1);return}
+  clientesMaster=resultados[0].data||[]
+  cobrancasMaster=resultados[1].data||[]
+  var lista=clientesMaster
+  var mesAtual=dataLocalInput(new Date()).slice(0,7)
+  var ativos=lista.filter(function(c){return c.ativo})
+  var clientesPagos=lista.filter(function(c){return pagamentoClienteNoMes(c.id,mesAtual)})
+  var atrasados=lista.filter(function(c){return c.ativo&&cobrancaEstaAtrasada(ultimaCobrancaDoCliente(c.id))})
+  var recebidoMes=cobrancasMaster.filter(function(c){return c.status==='pago'&&String(c.pago_em||'').slice(0,7)===mesAtual}).reduce(function(t,c){return t+Number(c.valor_pago==null?c.valor:c.valor_pago)},0)
+  var previsto=ativos.reduce(function(t,c){return t+Number(c.valor_mensal||0)},0)
+  document.getElementById('sa-tc').textContent=ativos.length
+  document.getElementById('sa-tp').textContent=clientesPagos.length
+  document.getElementById('sa-ta').textContent=atrasados.length
+  document.getElementById('sa-rec').textContent=moedaPainel(recebidoMes)
+  document.getElementById('sa-prev').textContent=moedaPainel(previsto)
+  if(!lista.length){document.getElementById('clientes-list').innerHTML='<div class="empty">Nenhum cliente cadastrado</div>';return}
+  var funcs=await Promise.all(lista.map(function(c){return db.from('funcionalidades').select('*').eq('cliente_id',c.id).maybeSingle()}))
   document.getElementById('clientes-list').innerHTML=lista.map(function(c,i){
     var f=funcs[i].data||{}
+    var cobranca=ultimaCobrancaDoCliente(c.id)
+    var pagouMes=pagamentoClienteNoMes(c.id,mesAtual)
+    var statusClasse='low',statusTexto='Sem cobrança'
+    if(cobranca&&cobranca.status==='pago'){statusClasse='ok';statusTexto='Pago'}
+    else if(cobrancaEstaAtrasada(cobranca)){statusClasse='out';statusTexto='Em atraso'}
+    else if(cobranca&&cobranca.status==='pendente'){statusClasse='low';statusTexto='Pendente'}
+    var ultimaData=c.ultimo_pagamento_em?formatarDataCobranca(c.ultimo_pagamento_em):'Nenhum'
+    var vencimento=cobranca&&cobranca.status==='pendente'?cobranca.vencimento:c.proximo_vencimento
     var pc=c.plano==='premium'?'var(--purple)':c.plano==='profissional'?'var(--acc)':'var(--txt2)'
     return'<div class="cliente-card">'+
       '<div class="cliente-header">'+
         '<div class="cliente-info">'+
-          '<div class="cliente-avatar">'+c.nome.charAt(0).toUpperCase()+'</div>'+
-          '<div><div class="cliente-name">'+c.nome+'</div><div class="cliente-email">'+c.email+' &bull; <span style="color:'+pc+';font-weight:600">'+c.plano.toUpperCase()+'</span></div></div>'+
+          '<div class="cliente-avatar">'+escaparHtmlRecibo(c.nome.charAt(0).toUpperCase())+'</div>'+
+          '<div><div class="cliente-name">'+escaparHtmlRecibo(c.nome)+'</div><div class="cliente-email">'+escaparHtmlRecibo(c.email)+' &bull; <span style="color:'+pc+';font-weight:600">'+escaparHtmlRecibo(String(c.plano||'basico').toUpperCase())+'</span></div></div>'+
         '</div>'+
-        '<div style="display:flex;gap:7px;align-items:center">'+
+        '<div class="cliente-actions">'+
           '<span class="tag '+(c.ativo?'ok':'out')+'">'+(c.ativo?'Ativo':'Inativo')+'</span>'+
-          '<button class="btn sm" onclick="abrirCriarDono(\''+c.id+'\',\''+c.nome.replace(/'/g,"\\'")+'\')" title="Criar login de admin para o dono dessa loja">&#x1F511; Criar acesso do dono</button>'+
+          '<span class="tag '+statusClasse+'">'+statusTexto+'</span>'+
+          '<button class="btn sm" onclick="abrirCriarDono(\''+c.id+'\')" title="Criar login de administrador para o dono">&#x1F511; Acesso do dono</button>'+
           '<button class="btn sm '+(c.ativo?'red':'grn')+'" onclick="toggleCliente(\''+c.id+'\','+c.ativo+')">'+(c.ativo?'Suspender':'Ativar')+'</button>'+
+        '</div>'+
+      '</div>'+
+      '<div class="cliente-billing">'+
+        '<div><span>Mensalidade</span><strong>'+moedaPainel(c.valor_mensal||0)+'</strong></div>'+
+        '<div><span>Próximo vencimento</span><strong>'+formatarDataCobranca(vencimento)+'</strong></div>'+
+        '<div><span>Último pagamento</span><strong>'+(pagouMes?'Pago neste mês • ':'')+ultimaData+'</strong></div>'+
+        '<div class="cliente-billing-actions">'+
+          '<button class="btn sm" onclick="abrirPlanoCliente(\''+c.id+'\')">Plano e valor</button>'+
+          (cobranca&&cobranca.status==='pendente'?'<button class="btn sm grn" onclick="abrirPagamentoCliente(\''+cobranca.id+'\',\''+c.id+'\')">Registrar pagamento</button>':'<button class="btn sm" onclick="gerarCobrancaCliente(\''+c.id+'\')">Gerar cobrança</button>')+
         '</div>'+
       '</div>'+
       '<div style="font-size:10px;color:var(--txt3);margin-bottom:9px;text-transform:uppercase;letter-spacing:.4px;font-weight:600">Funcionalidades liberadas</div>'+
@@ -2414,6 +2532,76 @@ async function renderSuperAdmin(){
   }).join('')
 }
 
+async function gerarCobrancaCliente(clienteId){
+  var cliente=clientesMaster.find(function(c){return c.id===clienteId})
+  if(!cliente)return
+  var pendente=cobrancasMaster.find(function(c){return c.cliente_id===clienteId&&c.status==='pendente'})
+  if(pendente){toast('Este cliente já possui uma cobrança pendente',1);return}
+  var vencimento=String(cliente.proximo_vencimento||proximoVencimentoDisponivel(cliente.dia_vencimento)).slice(0,10)
+  var competencia=vencimento.slice(0,7)+'-01'
+  var res=await db.from('cobrancas_clientes').insert({cliente_id:clienteId,competencia:competencia,vencimento:vencimento,valor:Number(cliente.valor_mensal||0)}).select().single()
+  if(res.error){toast(res.error.code==='23505'?'Já existe cobrança para esta competência':'Erro ao gerar cobrança',1);return}
+  toast('Cobrança gerada com sucesso')
+  renderSuperAdmin()
+}
+
+function abrirPagamentoCliente(cobrancaId,clienteId){
+  var cobranca=cobrancasMaster.find(function(c){return c.id===cobrancaId})
+  var cliente=clientesMaster.find(function(c){return c.id===clienteId})
+  if(!cobranca||!cliente)return
+  document.getElementById('sap-cobranca-id').value=cobrancaId
+  document.getElementById('sap-cliente-id').value=clienteId
+  document.getElementById('sap-vencimento').value=String(cobranca.vencimento).slice(0,10)
+  document.getElementById('sap-cliente').textContent=cliente.nome+' • Vencimento '+formatarDataCobranca(cobranca.vencimento)
+  document.getElementById('sap-valor').value=Number(cobranca.valor||0).toFixed(2)
+  document.getElementById('sap-data').value=dataLocalInput(new Date())
+  document.getElementById('sap-forma').value='pix'
+  document.getElementById('sap-obs').value=''
+  document.getElementById('ov-sa-pagamento').classList.add('open')
+}
+
+async function registrarPagamentoCliente(){
+  var cobrancaId=document.getElementById('sap-cobranca-id').value
+  var clienteId=document.getElementById('sap-cliente-id').value
+  var vencimento=document.getElementById('sap-vencimento').value
+  var valor=Number(document.getElementById('sap-valor').value)
+  var data=document.getElementById('sap-data').value
+  var forma=document.getElementById('sap-forma').value
+  var obs=document.getElementById('sap-obs').value.trim()
+  if(!cobrancaId||!clienteId||!data||!isFinite(valor)||valor<0){toast('Confira os dados do pagamento',1);return}
+  var pagoEm=new Date(data+'T12:00:00').toISOString()
+  var atualizacao=await db.from('cobrancas_clientes').update({status:'pago',valor_pago:valor,pago_em:pagoEm,forma_pagamento:forma,observacao:obs||null,atualizado_em:new Date().toISOString()}).eq('id',cobrancaId).eq('status','pendente').select().single()
+  if(atualizacao.error){toast('Não foi possível registrar o pagamento',1);return}
+  await db.from('clientes').update({ultimo_pagamento_em:pagoEm,proximo_vencimento:somarMesData(vencimento)}).eq('id',clienteId)
+  closeModals()
+  toast('Pagamento registrado com sucesso')
+  renderSuperAdmin()
+}
+
+function abrirPlanoCliente(clienteId){
+  var cliente=clientesMaster.find(function(c){return c.id===clienteId})
+  if(!cliente)return
+  document.getElementById('sapl-cliente-id').value=clienteId
+  document.getElementById('sapl-cliente').textContent=cliente.nome
+  document.getElementById('sapl-plano').value=cliente.plano||'basico'
+  document.getElementById('sapl-valor').value=Number(cliente.valor_mensal||0).toFixed(2)
+  document.getElementById('sapl-dia').value=cliente.dia_vencimento||10
+  document.getElementById('sapl-venc').value=String(cliente.proximo_vencimento||proximoVencimentoPorDia(cliente.dia_vencimento,1)).slice(0,10)
+  document.getElementById('ov-sa-plano').classList.add('open')
+}
+
+async function salvarPlanoCliente(){
+  var id=document.getElementById('sapl-cliente-id').value
+  var plano=document.getElementById('sapl-plano').value
+  var valor=Number(document.getElementById('sapl-valor').value)
+  var dia=Number(document.getElementById('sapl-dia').value)
+  var vencimento=document.getElementById('sapl-venc').value
+  if(!id||!isFinite(valor)||valor<0||dia<1||dia>28||!vencimento){toast('Confira os dados do plano',1);return}
+  var res=await db.from('clientes').update({plano:plano,valor_mensal:valor,dia_vencimento:dia,proximo_vencimento:vencimento}).eq('id',id)
+  if(res.error){toast('Não foi possível salvar o plano',1);return}
+  closeModals();toast('Plano atualizado');renderSuperAdmin()
+}
+
 async function toggleFunc(clienteId,funcKey,valor,funcId){
   if(funcId&&funcId!==''){await db.from('funcionalidades').update({[funcKey]:valor}).eq('id',funcId)}
   else{await db.from('funcionalidades').insert({cliente_id:clienteId,[funcKey]:valor})}
@@ -2427,7 +2615,9 @@ async function toggleCliente(id,ativo){
 
 // Cria o primeiro login (nivel admin) de uma loja, direto do Painel Master — sem precisar
 // de SQL manual. Essa conta so enxerga a propria loja (RLS), nunca o Painel Master.
-function abrirCriarDono(clienteId,clienteNome){
+function abrirCriarDono(clienteId){
+  var cliente=clientesMaster.find(function(c){return c.id===clienteId})
+  var clienteNome=cliente?cliente.nome:'Loja'
   document.getElementById('sao-cliente-id').value=clienteId
   document.getElementById('sao-loja-nome').textContent='Loja: '+clienteNome
   document.getElementById('sao-nome').value=''
@@ -2661,15 +2851,31 @@ async function addContaReceber(){
 }
 
 async function addSaCliente(){
+  if(!userLogado||userLogado.nivel!=='superadmin'){toast('Acesso exclusivo da administração geral',1);return}
   var nome=capitalizarNomeProd(document.getElementById('nc-nome').value.trim())
   var email=document.getElementById('nc-email').value.trim()
-  var tel=document.getElementById('nc-tel').value
+  var tel=document.getElementById('nc-tel').value.trim()
+  var tipo=document.getElementById('nc-tipo').value
   var plano=document.getElementById('nc-plano').value
-  if(!nome||!email){toast('Preencha nome e email',1);return}
-  var res=await db.from('clientes').insert({nome:nome,email:email,telefone:tel,plano:plano}).select().single()
-  if(res.error){toast('Erro',1);return}
-  await db.from('funcionalidades').insert({cliente_id:res.data.id,pdv:true,estoque:true,promocoes:false,financeiro:false,relatorios:false,multiplos_caixas:false,impressao_cupom:false,maquininha:false,whatsapp_alertas:false,atendimento_mesas:false})
-  closeModals();renderSuperAdmin();toast('Cliente cadastrado!')
+  var valor=Number(document.getElementById('nc-valor').value)
+  var dia=Number(document.getElementById('nc-dia').value)
+  var vencimento=document.getElementById('nc-venc').value
+  if(!nome||!email){toast('Preencha nome e e-mail',1);return}
+  if(!/^\S+@\S+\.\S+$/.test(email)){toast('Informe um e-mail válido',1);return}
+  if(!isFinite(valor)||valor<0||dia<1||dia>28||!vencimento){toast('Confira mensalidade e vencimento',1);return}
+  var res=await db.from('clientes').insert({nome:nome,email:email,telefone:tel||null,tipo_negocio:tipo,plano:plano,valor_mensal:valor,dia_vencimento:dia,proximo_vencimento:vencimento,ativo:true}).select().single()
+  if(res.error){toast('Não foi possível cadastrar o cliente',1);return}
+  var clienteId=res.data.id
+  var cobrancaRes=await db.from('cobrancas_clientes').insert({cliente_id:clienteId,competencia:vencimento.slice(0,7)+'-01',vencimento:vencimento,valor:valor})
+  var funcRes=cobrancaRes.error?{error:cobrancaRes.error}:await db.from('funcionalidades').insert({cliente_id:clienteId,pdv:true,estoque:true,promocoes:false,financeiro:false,relatorios:false,multiplos_caixas:false,impressao_cupom:false,maquininha:false,whatsapp_alertas:false,atendimento_mesas:false})
+  if(funcRes.error||cobrancaRes.error){
+    await db.from('clientes').delete().eq('id',clienteId)
+    toast('O cadastro não foi concluído. Tente novamente.',1)
+    return
+  }
+  closeModals()
+  toast('Cliente e primeira cobrança cadastrados')
+  await go('superadmin')
 }
 
 function imprimirCartazModal(){

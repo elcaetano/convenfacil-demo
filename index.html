@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ConvênFácil</title>
+<title>ConvenFácil</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Oswald:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="./styles.css?v=20260831-18">
+<link rel="stylesheet" href="./styles.css?v=20260831-19">
 </head>
 <body>
 
@@ -16,7 +16,7 @@
   <div class="login-box">
     <div class="login-logo">
       <div class="login-logo-icon">&#x1F3EA;</div>
-      <div><div class="login-logo-text">ConvênFácil</div><div class="login-logo-sub">Sistema PDV</div></div>
+      <div><div class="login-logo-text">ConvenFácil</div><div class="login-logo-sub">Sistema PDV</div></div>
     </div>
     <div class="login-title">Bem-vindo de volta</div>
     <div class="login-sub">Entre com suas credenciais</div>
@@ -26,7 +26,7 @@
       <div class="fg"><label for="login-senha">Senha</label><input type="password" id="login-senha" placeholder="••••••••" autocomplete="current-password" required></div>
       <button class="btn-login" type="submit" id="btn-login-do">Entrar no sistema</button>
     </form>
-    <div class="login-footer">ConvênFácil &copy; 2026. Desenvolvido por <a href="https://ninjai.com.br" target="_blank" rel="noopener noreferrer"><img src="https://www.ninjai.com.br/ninjai-logo.png" alt="NinjAI" style="height:16px;vertical-align:middle;opacity:.7;transition:.2s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.7"></a></div>
+    <div class="login-footer">ConvenFácil &copy; 2026. Desenvolvido por <a href="https://ninjai.com.br" target="_blank" rel="noopener noreferrer"><img src="https://www.ninjai.com.br/ninjai-logo.png" alt="NinjAI" style="height:16px;vertical-align:middle;opacity:.7;transition:.2s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.7"></a></div>
   </div>
 </div>
 
@@ -35,7 +35,7 @@
   <div class="sidebar">
     <div class="logo">
       <div class="logo-icon">&#x1F3EA;</div>
-      <div class="logo-copy"><div class="logo-name">ConvênFácil</div><div class="logo-sub">PDV</div></div>
+      <div class="logo-copy"><div class="logo-name">ConvenFácil</div><div class="logo-sub">PDV</div></div>
     </div>
     <div class="nav-wrap" id="nav-wrap">
       <!-- VENDAS -->
@@ -373,7 +373,17 @@
     <div class="sec" id="sec-config">
       <div class="topbar"><h1>Configurações</h1></div>
       <div class="sec-body">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div class="lcard cfg-master-card" id="cfg-admin-clientes" style="display:none">
+          <div>
+            <h3>&#x1F3EA; Administração de clientes</h3>
+            <p>Cadastre uma nova conveniência, mercearia ou outro comércio e acompanhe plano, mensalidades e acesso.</p>
+          </div>
+          <div class="cfg-master-actions">
+            <button class="btn" type="button" onclick="go('superadmin')">Ver clientes</button>
+            <button class="btn acc" type="button" onclick="abrirNovoClienteSaas()">+ Novo cliente</button>
+          </div>
+        </div>
+        <div class="config-grid">
           <!-- DADOS DA LOJA -->
           <div class="lcard">
             <h3 style="margin-bottom:16px">&#x1F3EA; Dados da Loja</h3>
@@ -439,13 +449,16 @@
       <div class="sec-body">
         <div class="sa-header">
           <div class="sa-header-icon">&#x1F3F0;</div>
-          <div><div class="sa-header-title">Painel Master</div><div class="sa-header-sub">Gerencie todas as lojas, planos e funcionalidades</div></div>
+          <div class="sa-header-copy"><div class="sa-header-title">Painel Master</div><div class="sa-header-sub">Gerencie lojas, mensalidades, acessos e funcionalidades</div></div>
+          <button class="btn acc sa-new-client" type="button" onclick="abrirNovoClienteSaas()">+ Novo cliente</button>
         </div>
         <div class="sa-cards">
           <div class="sa-card"><div class="val" style="color:var(--acc)" id="sa-tc">0</div><div class="lbl">Clientes ativos</div></div>
-          <div class="sa-card"><div class="val" style="color:var(--green)" id="sa-tp">0</div><div class="lbl">Planos pagos</div></div>
-          <div class="sa-card"><div class="val" style="color:var(--purple)" id="sa-rec">R$ 0</div><div class="lbl">Receita mensal</div></div>
+          <div class="sa-card"><div class="val" style="color:var(--green)" id="sa-tp">0</div><div class="lbl">Pagaram neste mês</div></div>
+          <div class="sa-card"><div class="val" style="color:var(--red)" id="sa-ta">0</div><div class="lbl">Em atraso</div></div>
+          <div class="sa-card"><div class="val" style="color:var(--purple)" id="sa-rec">R$ 0</div><div class="lbl">Recebido neste mês</div></div>
         </div>
+        <div class="sa-forecast">Receita mensal prevista com clientes ativos: <strong id="sa-prev">R$ 0,00</strong></div>
         <div id="clientes-list"><div class="loading"><div class="spin"></div>Carregando...</div></div>
       </div>
     </div>
@@ -653,14 +666,60 @@
 
 <div class="ov" id="ov-sa-cliente">
   <div class="modal">
-    <h2>&#x1F3EA; Novo cliente SaaS</h2>
-    <div class="fgrid c1"><div class="fg"><label>Nome da loja</label><input type="text" id="nc-nome" placeholder="Ex: Conveniencia do Jose"></div></div>
+    <h2>&#x1F3EA; Novo cliente</h2>
+    <p class="modal-intro">Cadastre o estabelecimento e já deixe a primeira mensalidade organizada.</p>
+    <div class="fgrid c1"><div class="fg"><label>Nome do estabelecimento</label><input type="text" id="nc-nome" placeholder="Ex: Conveniência Central"></div></div>
     <div class="fgrid c2">
-      <div class="fg"><label>Email</label><input type="email" id="nc-email" placeholder="jose@email.com"></div>
+      <div class="fg"><label>E-mail do responsável</label><input type="email" id="nc-email" placeholder="responsavel@email.com"></div>
       <div class="fg"><label>Telefone</label><input type="text" id="nc-tel" placeholder="(11) 99999-9999"></div>
     </div>
-    <div class="fgrid c2"><div class="fg"><label>Plano</label><select id="nc-plano"><option value="basico">Basico</option><option value="profissional">Profissional</option><option value="premium">Premium</option></select></div></div>
+    <div class="fgrid c2">
+      <div class="fg"><label>Tipo de comércio</label><select id="nc-tipo"><option value="conveniencia">Conveniência</option><option value="mercearia">Mercearia</option><option value="mercado">Mercado</option><option value="bar_restaurante">Bar ou restaurante</option><option value="outro">Outro</option></select></div>
+      <div class="fg"><label>Plano</label><select id="nc-plano" onchange="sugerirValorPlano(this.value)"><option value="basico">Básico</option><option value="profissional" selected>Profissional</option><option value="premium">Premium</option></select></div>
+    </div>
+    <div class="fgrid c3">
+      <div class="fg"><label>Mensalidade (R$)</label><input type="number" id="nc-valor" value="149" step="0.01" min="0"></div>
+      <div class="fg"><label>Dia de vencimento</label><input type="number" id="nc-dia" value="10" min="1" max="28" oninput="atualizarPrimeiroVencimento()"></div>
+      <div class="fg"><label>Primeiro vencimento</label><input type="date" id="nc-venc"></div>
+    </div>
     <div class="modal-ft"><button class="btn" onclick="closeModals()">Cancelar</button><button class="btn acc" onclick="addSaCliente()">Cadastrar</button></div>
+  </div>
+</div>
+
+<div class="ov" id="ov-sa-pagamento">
+  <div class="modal">
+    <h2>&#x2705; Registrar pagamento</h2>
+    <p class="modal-intro" id="sap-cliente">Cliente</p>
+    <input type="hidden" id="sap-cobranca-id">
+    <input type="hidden" id="sap-cliente-id">
+    <input type="hidden" id="sap-vencimento">
+    <div class="fgrid c2">
+      <div class="fg"><label>Valor recebido (R$)</label><input type="number" id="sap-valor" step="0.01" min="0"></div>
+      <div class="fg"><label>Data do pagamento</label><input type="date" id="sap-data"></div>
+    </div>
+    <div class="fgrid c2">
+      <div class="fg"><label>Forma de pagamento</label><select id="sap-forma"><option value="pix">PIX</option><option value="dinheiro">Dinheiro</option><option value="transferencia">Transferência</option><option value="cartao">Cartão</option><option value="outro">Outro</option></select></div>
+      <div class="fg"><label>Observação</label><input type="text" id="sap-obs" placeholder="Opcional"></div>
+    </div>
+    <div class="modal-ft"><button class="btn" onclick="closeModals()">Cancelar</button><button class="btn grn" onclick="registrarPagamentoCliente()">Confirmar pagamento</button></div>
+  </div>
+</div>
+
+<div class="ov" id="ov-sa-plano">
+  <div class="modal">
+    <h2>&#x1F4CB; Plano e cobrança</h2>
+    <p class="modal-intro" id="sapl-cliente">Cliente</p>
+    <input type="hidden" id="sapl-cliente-id">
+    <div class="fgrid c2">
+      <div class="fg"><label>Plano</label><select id="sapl-plano"><option value="basico">Básico</option><option value="profissional">Profissional</option><option value="premium">Premium</option></select></div>
+      <div class="fg"><label>Mensalidade (R$)</label><input type="number" id="sapl-valor" step="0.01" min="0"></div>
+    </div>
+    <div class="fgrid c2">
+      <div class="fg"><label>Dia de vencimento</label><input type="number" id="sapl-dia" min="1" max="28"></div>
+      <div class="fg"><label>Próximo vencimento</label><input type="date" id="sapl-venc"></div>
+    </div>
+    <p class="field-help">Uma cobrança pendente mantém o valor e o vencimento com que foi emitida. As alterações valem para a próxima cobrança.</p>
+    <div class="modal-ft"><button class="btn" onclick="closeModals()">Cancelar</button><button class="btn acc" onclick="salvarPlanoCliente()">Salvar alterações</button></div>
   </div>
 </div>
 
@@ -1014,6 +1073,6 @@
 
 <div class="toast ok" id="tst"><span class="tic" id="tic">&#x2713;</span><span id="tst-m">ok</span></div>
 
-<script src="./app.js?v=20260831-21"></script>
+<script src="./app.js?v=20260831-22"></script>
 </body>
 </html>

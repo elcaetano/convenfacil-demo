@@ -287,6 +287,11 @@ tr:hover td{background:var(--bg2)}
 .lrow{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;color:var(--txt2)}
 .lrow:last-child{border-bottom:none}
 .lrow strong{color:var(--txt1)}
+.config-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.cfg-master-card{margin-bottom:16px;align-items:center;justify-content:space-between;gap:18px;border-color:rgba(79,142,247,.28);background:linear-gradient(135deg,rgba(79,142,247,.08),rgba(167,139,250,.05))}
+.cfg-master-card h3{margin-bottom:5px!important;color:var(--txt1)}
+.cfg-master-card p{font-size:12px;color:var(--txt3);line-height:1.5;max-width:660px}
+.cfg-master-actions{display:flex;gap:8px;flex-shrink:0}
 .receipt-history-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
 .receipt-history-row:last-child{border-bottom:none}
 .receipt-history-info{display:flex;flex-direction:column;min-width:0;color:var(--txt2)}
@@ -305,18 +310,28 @@ tr:hover td{background:var(--bg2)}
 /* SUPER ADMIN */
 .sa-header{background:linear-gradient(135deg,rgba(167,139,250,.15),rgba(79,142,247,.1));border:1px solid rgba(167,139,250,.3);border-radius:var(--rad2);padding:18px 22px;margin-bottom:18px;display:flex;align-items:center;gap:14px}
 .sa-header-icon{font-size:32px}
+.sa-header-copy{flex:1;min-width:0}
+.sa-new-client{margin-left:auto;flex-shrink:0}
 .sa-header-title{font-size:17px;font-weight:700;color:var(--purple)}
 .sa-header-sub{font-size:12px;color:var(--txt3);margin-top:3px}
-.sa-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px}
+.sa-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px}
 .sa-card{background:var(--bg1);border:1px solid var(--border);border-radius:var(--rad2);padding:14px;text-align:center}
 .sa-card .val{font-size:28px;font-weight:800;margin-bottom:4px}
 .sa-card .lbl{font-size:12px;color:var(--txt3)}
+.sa-forecast{font-size:12px;color:var(--txt3);text-align:right;margin:0 2px 16px}
+.sa-forecast strong{color:var(--txt1)}
 .cliente-card{background:var(--bg1);border:1px solid var(--border);border-radius:var(--rad2);padding:16px;margin-bottom:10px}
 .cliente-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
 .cliente-info{display:flex;align-items:center;gap:10px}
+.cliente-actions{display:flex;gap:7px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
 .cliente-avatar{width:38px;height:38px;background:linear-gradient(135deg,var(--acc),var(--purple));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700;color:#fff;flex-shrink:0}
 .cliente-name{font-size:14px;font-weight:600}
 .cliente-email{font-size:12px;color:var(--txt3);margin-top:2px}
+.cliente-billing{display:grid;grid-template-columns:repeat(3,minmax(120px,1fr)) auto;gap:8px;padding:10px;margin-bottom:12px;background:var(--bg2);border:1px solid var(--border);border-radius:9px}
+.cliente-billing>div:not(.cliente-billing-actions){display:flex;flex-direction:column;gap:3px;min-width:0}
+.cliente-billing span{font-size:10px;color:var(--txt3);text-transform:uppercase;letter-spacing:.35px}
+.cliente-billing strong{font-size:12px;color:var(--txt1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cliente-billing-actions{display:flex;align-items:center;justify-content:flex-end;gap:7px;flex-wrap:wrap}
 .func-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
 .func-item{display:flex;align-items:center;justify-content:space-between;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:9px 10px}
 .func-item.on{background:rgba(62,207,142,.08);border-color:rgba(62,207,142,.2)}
@@ -352,6 +367,8 @@ tr:hover td{background:var(--bg2)}
 .ci-del:hover{background:var(--red-dim);border-color:var(--red)}
 @media (max-width:640px){.resumo-flex{flex-direction:column;overflow-y:auto}.resumo-pay-col{width:100%}.resumo-itens-col{max-height:32vh;flex:none}}
 .modal h2{font-size:15px;font-weight:700;margin-bottom:18px}
+.modal-intro{font-size:12px;line-height:1.5;color:var(--txt3);margin:-9px 0 16px}
+.field-help{font-size:11px;line-height:1.45;color:var(--txt3);margin-top:4px}
 .fgrid{display:grid;gap:10px;margin-bottom:10px}
 .c3{grid-template-columns:1fr 1fr 1fr}.c2{grid-template-columns:1fr 1fr}.c1{grid-template-columns:1fr}
 .modal-ft{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;padding-top:16px;border-top:1px solid var(--border)}
@@ -452,8 +469,16 @@ tr:hover td{background:var(--bg2)}
 
   /* Cartoes de resumo (financeiro, master, funcionalidades) — menos colunas pra nao espremer */
   .cards-grid{grid-template-columns:repeat(2,1fr)!important}
-  .sa-cards{grid-template-columns:1fr!important}
+  .sa-cards{grid-template-columns:repeat(2,1fr)!important}
   .func-grid{grid-template-columns:repeat(2,1fr)!important}
+  .config-grid{grid-template-columns:1fr}
+  .cfg-master-card{align-items:flex-start;flex-direction:column}
+  .cfg-master-actions{width:100%}
+  .cfg-master-actions .btn{flex:1;justify-content:center}
+  .cliente-header{align-items:flex-start;gap:12px;flex-direction:column}
+  .cliente-actions{justify-content:flex-start}
+  .cliente-billing{grid-template-columns:1fr 1fr}
+  .cliente-billing-actions{grid-column:1/-1;justify-content:flex-start}
 
   /* Formularios dos modais: 1 coluna so, mais facil de preencher com o dedo */
   .fgrid.c2,.fgrid.c3{grid-template-columns:1fr}
@@ -469,4 +494,10 @@ tr:hover td{background:var(--bg2)}
   .search-box-unified:focus-within .search-assist{max-height:52px}
   .search-assist{flex-direction:column;align-items:flex-start;gap:3px}
   .search-assist span+span{border-left:0;padding-left:0}
+  .sa-header{align-items:flex-start;flex-wrap:wrap;padding:14px}
+  .sa-cards{grid-template-columns:1fr!important}
+  .sa-new-client{width:100%;justify-content:center}
+  .cliente-billing{grid-template-columns:1fr}
+  .cliente-billing-actions{grid-column:auto}
+  .cliente-billing-actions .btn{flex:1;justify-content:center}
 }
