@@ -407,11 +407,13 @@ function abrirGrupoMenu(id){
 }
 
 function selecionarGrupoMenu(id){
-  document.querySelectorAll('.nav-group-header').forEach(function(el){el.classList.remove('on')})
   document.querySelectorAll('.context-nav-group').forEach(function(el){el.classList.remove('on')})
   var header=document.querySelector('#grp-'+id+' .nav-group-header')
   var submenu=document.getElementById('submenu-'+id)
-  if(header)header.classList.add('on')
+  document.querySelectorAll('.nav-group-header').forEach(function(el){
+    el.removeAttribute('aria-current')
+  })
+  if(header)header.setAttribute('aria-current','page')
   if(submenu)submenu.classList.add('on')
   var contextNav=document.getElementById('context-nav')
   var contextTitle=document.getElementById('context-nav-title')
@@ -1667,10 +1669,12 @@ function atualizarStatusCaixaPdv(){
     if(turnoAtual){
       var desde=new Date(turnoAtual.aberto_em).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})
       status.textContent='Caixa aberto desde '+desde
+      status.style.display='inline-flex'
       status.classList.remove('closed')
     }else{
-      status.textContent='Caixa fechado: abra para iniciar as vendas'
-      status.classList.add('closed')
+      status.textContent=''
+      status.style.display='none'
+      status.classList.remove('closed')
     }
   }
   if(botaoAbrir)botaoAbrir.style.display=turnoAtual?'none':'inline-flex'
