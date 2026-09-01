@@ -73,7 +73,7 @@ function imprimirComPreview(html,tituloBarra,janelaAberta,permitirFormato){
   var fundoPreview='<style>'+
     '@media screen{'+
       'html{background:#0d0f14;padding:0 14px 28px}'+
-      'body{box-shadow:0 12px 48px rgba(0,0,0,.55);margin-left:auto!important;margin-right:auto!important}'+
+      'body{background:#fff!important;color:#111!important;min-height:calc(100vh - 28px);box-shadow:0 12px 48px rgba(0,0,0,.55);margin-left:auto!important;margin-right:auto!important}'+
       '.preview-toolbar{position:fixed;top:0;left:0;right:0;min-height:64px;background:#13161e;padding:10px 18px;display:flex;align-items:center;justify-content:space-between;gap:14px;z-index:999;border-bottom:1px solid #2e3548;font-family:system-ui,-apple-system,sans-serif;box-shadow:0 4px 24px rgba(0,0,0,.4)}'+
       '.preview-heading{display:flex;align-items:center;gap:10px;color:#fff;min-width:0}.preview-heading strong{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.preview-heading small{display:block;color:#8991ac;font-size:11px;margin-top:2px}.preview-icon{font-size:20px}'+
       '.preview-formats{height:38px;padding:3px;display:flex;align-items:center;gap:3px;border:1px solid #3a4260;border-radius:9px;background:#0d0f14;color:#8991ac;font-size:11px;white-space:nowrap}.preview-formats>span{padding:0 6px}.preview-formats button{height:30px;padding:0 10px;border:1px solid transparent;border-radius:6px;background:transparent;color:#b3b9cf;font-family:inherit;font-size:11px;font-weight:700;cursor:pointer}.preview-formats button.on{background:#1a2d52;border-color:#4f8ef7;color:#fff}'+
@@ -2129,16 +2129,25 @@ function printRel(){
   var titulos = {vendas:'Relatorio de Vendas', vendas_forma:'Vendas por Forma de Pagamento', fechamento_caixa:'Fechamento de Caixa', sangrias:'Sangrias e Suprimentos', mesas:'Relatorio de Mesas Atendidas', comissoes_garcom:'Relatorio de Comissoes de Garcons', pix:'Relatorio PIX', abc:'Curva ABC de Produtos', giro:'Giro de Estoque', horario:'Mais Vendidos por Horario', pagar:'Relatorio Contas a Pagar', excecoes:'Relatorio de Excecoes'}
   var html = '<!DOCTYPE html><html><head><meta charset="UTF-8">'+
     '<style>'+
-    'body{font-family:Arial,sans-serif;font-size:12px;color:#000;padding:15px}'+
-    'h1{font-size:16px;margin-bottom:4px}'+
-    '.sub{font-size:11px;color:#666;margin-bottom:16px}'+
-    'table{width:100%;border-collapse:collapse;font-size:12px}'+
-    'th{background:#eee;padding:7px;text-align:left;border:1px solid #ddd;font-weight:600}'+
-    'td{padding:7px;border:1px solid #ddd}'+
-    '.mc{background:#f9f9f9;border:1px solid #ddd;border-radius:6px;padding:12px;margin-bottom:16px;display:inline-block;min-width:200px}'+
-    '.mc .lbl{font-size:10px;color:#666;text-transform:uppercase;margin-bottom:4px}'+
-    '.mc .val{font-size:20px;font-weight:700}'+
-    '@media print{body{padding:5px}}'+
+    ':root{--green:#087f5b;--red:#c92a2a;--yellow:#8a5b00;--txt1:#111;--txt2:#333;--txt3:#666}'+
+    '@page{size:A4 portrait;margin:12mm}'+
+    '*{box-sizing:border-box}html,body{margin:0;background:#fff;color:#111}'+
+    'body{max-width:190mm;min-height:260mm;margin:0 auto;padding:12mm;font-family:Arial,sans-serif;font-size:11px;line-height:1.35}'+
+    'h1{font-size:18px;line-height:1.2;margin:0 0 4px;color:#111}'+
+    'body>.sub{font-size:10.5px;color:#555;margin-bottom:18px}'+
+    '.tbl{width:100%;overflow:visible;border-radius:6px}'+
+    'table{width:100%;border-collapse:collapse;font-size:10.5px;color:#111}'+
+    'thead{display:table-header-group}tr{break-inside:avoid}'+
+    'th{background:#e9ecef;color:#111;padding:7px;text-align:left;border:1px solid #c8ccd0;font-weight:700}'+
+    'td{background:#fff;color:#111;padding:7px;border:1px solid #d7dadd;vertical-align:top}'+
+    '.mc{background:#f7f8fa;color:#111;border:1px solid #c8ccd0;border-radius:6px;padding:12px;margin-bottom:16px;display:inline-block;min-width:210px;break-inside:avoid}'+
+    '.mc .lbl{font-size:9.5px;color:#555;text-transform:uppercase;margin-bottom:4px}'+
+    '.mc .val{font-size:21px;line-height:1.1;font-weight:700;color:#111}'+
+    '.mc .sub{font-size:10px;color:#555;margin-top:3px;margin-bottom:0}'+
+    '.tag{display:inline-block;padding:2px 6px;border:1px solid #adb5bd;border-radius:10px;color:#111;background:#f1f3f5;font-size:9px;font-weight:700}'+
+    '.tag.ok{color:#087f5b;border-color:#8fd8bc;background:#e8f8f1}.tag.out{color:#c92a2a;border-color:#f0aaaa;background:#fff0f0}'+
+    '.empty{padding:10px;color:#555;text-align:center}.btn{display:none!important}'+
+    '@media screen{body{margin-top:0}}@media print{body{max-width:none;min-height:0;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}}'+
     '</style></head><body>'+
     '<h1>'+loja+': '+(titulos[tipo]||'Relatorio')+'</h1>'+
     '<div class="sub">Gerado em: '+now+'</div>'+
